@@ -221,7 +221,8 @@ body {
 /* 注册页（独立视图） */
 .brand-row { display: flex; justify-content: space-between; align-items: center; }
 .link-btn { background: none; border: 1px solid var(--line, #eee); border-radius: 14px; padding: 4px 12px; font-size: 12px; color: var(--red, #FF2442); }
-.register-view { padding: 0 16px 24px; }
+/* 与 .screen 等高：切到注册页时手机框不塌陷（保持 760px + 可滚） */
+.register-view { padding: 0 16px 24px; height: 760px; overflow-y: auto; }
 .register-header { display: flex; align-items: center; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--line, #eee); }
 .back-btn { background: none; border: none; font-size: 18px; color: var(--ink, #1a1a1a); padding: 4px 8px; }
 .register-title { font-size: 15px; font-weight: 600; }

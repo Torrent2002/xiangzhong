@@ -21,9 +21,10 @@
 
 ## 运行实录
 
-**无 API key、本地兜底模式**已实测跑通两条链路（显性匹配 + 隐性偏好发现），真实 API 输入输出见 [`docs/RUNLOG.md`](./docs/RUNLOG.md)。
+- **本地兜底模式**（无 key）：显性匹配 + 隐性偏好发现两条链路已实测跑通。
+- **AI 模式**（配 key · `doubao-seed-2.0-pro` 多模态）：文本意图解析 + 照片 vision 识别外貌特征均实测跑通。
 
-要看 UI 效果，clone 后跑 `python app.py` 打开 http://localhost:8000。
+真实 API 输入输出、异步预计算架构、详情页去标定见 [`docs/RUNLOG.md`](./docs/RUNLOG.md)（§3 AI 模式 / §4 异步预计算 / §5 详情页克制）。要看 UI 效果，clone 后跑 `python app.py` 打开 http://localhost:8000。
 
 ---
 
@@ -40,15 +41,18 @@ cd demo
 pip install -r requirements.txt
 
 # 可选：接真 AI（不配也能跑，走本地兜底）
-cp .env.example .env       # 填入 OPENAI_API_KEY / OPENAI_BASE_URL / MODEL
+cp .env.example .env       # 填 OPENAI_API_KEY / OPENAI_BASE_URL / MODEL
+# 启用「上传理想型照片」识别：再配支持 vision 的 VISION_MODEL（如 doubao-seed-2.0-pro）
 
 python app.py              # → 浏览器打开 http://localhost:8000
 ```
 
 ### 体验路径
-1. 输入 `温柔、不戴眼镜、瓜子脸、文艺风` → 点「AI 帮我找」
-2. 看"AI 把你的描述理解为…"（透明化）+ 候选卡 + "为什么推荐"
-3. 点几张 ♡ → 点「看看 AI 发现了什么」→ 隐性偏好提示卡
+1. 输入 `温柔、不戴眼镜、瓜子脸、文艺风` → 点「AI 帮我找」（或点「上传理想型照片」让 AI vision 反推）
+2. 看"AI 把你的描述理解为…"（透明化）+ 候选卡 + "为什么推荐" → 点卡进详情页
+3. 详情页只露基本信息 + 匹配度（AI 标定藏在后台，产品克制）
+4. 点几张 ♡ → 点「看看 AI 发现了什么」→ 隐性偏好提示卡
+5. 点顶部「我的资料」→ 注册自己（资料 + 照片 + bio）→ 进入候选人池被别人匹配
 
 ---
 
@@ -76,9 +80,10 @@ python app.py              # → 浏览器打开 http://localhost:8000
 │   ├── modules/
 │   │   ├── explicit_preference.py   # 显性偏好链路
 │   │   ├── implicit_preference.py   # 隐性偏好链路
-│   │   ├── ai_client.py              # OpenAI 兼容封装 + 兜底
+│   │   ├── ai_client.py              # OpenAI 兼容封装 + vision + 兜底
+│   │   ├── candidate_store.py       # 候选人内存索引 + 异步预计算
 │   │   └── fallback.py              # 本地兜底逻辑
-│   ├── data/candidates.json          # 12 个候选样本
+│   ├── data/candidates.json          # 12 个候选样本（启动即预计算）
 │   ├── static/                       # 手机框 UI
 │   └── avatars/                      # 自绘 SVG 头像（属性与图一致）
 └── docs/
@@ -100,8 +105,9 @@ python app.py              # → 浏览器打开 http://localhost:8000
 
 ## 已知局限
 
-- 候选池是 mock 的 12 个，非真实双边
-- 头像为 SVG 插画，无真实照片识别（参考图通道置灰）
+- 候选池以 12 个 mock 种子起步；用户可注册成为候选人（候选人 = 注册用户自己），但仍是单机 demo、无真实多用户
+- 种子候选头像是离线 SVG；**用户上传的照片**走真实 vision 识别（glasses/faceShape/style/vibe），未配 vision 模型则降级
+- 注册即写、后台异步预计算 attributes（不阻塞注册），查询走结构化匹配 + 多级兜底
 - 行为反推为雏形统计，非偏好向量建模
 - 行为日志进程内，刷新清空
 

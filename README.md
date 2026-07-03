@@ -47,6 +47,14 @@ cp .env.example .env       # 填 OPENAI_API_KEY / OPENAI_BASE_URL / MODEL
 python app.py              # → 浏览器打开 http://localhost:8000
 ```
 
+### 跑测试
+```bash
+cd demo
+pip install -r requirements-dev.txt   # pytest
+python -m pytest                       # 50 个用例，全跑兜底模式（不打真 LLM、不联网）
+```
+测试覆盖 5 个模块 + 全部 API 端点；`tests/conftest.py` 强制清空 key，避免 `.env` 真 key 让测试去打 LLM。
+
 ### 体验路径
 1. 输入 `温柔、不戴眼镜、瓜子脸、文艺风` → 点「AI 帮我找」（或点「上传理想型照片」让 AI vision 反推）
 2. 看"AI 把你的描述理解为…"（透明化）+ 候选卡 + "为什么推荐" → 点卡进详情页

@@ -44,7 +44,7 @@ def _new_id() -> str:
     return "u" + str(int(time.time() * 1000))
 
 
-def create(name: str, age: Any, city: str, photo_b64: str) -> dict:
+def create(name: str, age: Any, city: str, photo_b64: str, bio: str = "") -> dict:
     load()
     cid = _new_id()
     cand: dict = {
@@ -55,7 +55,7 @@ def create(name: str, age: Any, city: str, photo_b64: str) -> dict:
         "photo": "avatars/c01.svg",  # 占位头像（新建候选无成品头像）
         "attributes": None,
         "analysis_status": "pending",
-        "bio": "",
+        "bio": (bio or "").strip(),
     }
     _candidates.append(cand)
     _by_id[cid] = cand

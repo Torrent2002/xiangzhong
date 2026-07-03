@@ -26,14 +26,18 @@ const els = {
   detailPanel: $("detailPanel"),
   detailBody: $("detailBody"),
   detailClose: $("detailClose"),
-  createImage: $("createImage"),
-  createImageBtn: $("createImageBtn"),
-  createPhotoName: $("createPhotoName"),
-  createName: $("createName"),
-  createAge: $("createAge"),
-  createCity: $("createCity"),
-  createBtn: $("createBtn"),
-  createMsg: $("createMsg"),
+  myProfileBtn: $("myProfileBtn"),
+  registerView: $("registerView"),
+  registerBack: $("registerBack"),
+  regImage: $("regImage"),
+  regImageBtn: $("regImageBtn"),
+  regPhotoName: $("regPhotoName"),
+  regName: $("regName"),
+  regAge: $("regAge"),
+  regCity: $("regCity"),
+  regBio: $("regBio"),
+  regSubmit: $("regSubmit"),
+  regMsg: $("regMsg"),
 };
 
 function show(el) { el.classList.remove("hidden"); }
@@ -435,52 +439,67 @@ els.suggestBtn.addEventListener("click", async () => {
   }
 });
 
-/* ===== 创建候选人（演示异步预计算：写入即时返回，后台分析） ===== */
-let _createPhotoB64 = "";
-els.createImageBtn.addEventListener("click", () => els.createImage.click());
-els.createImage.addEventListener("change", () => {
-  const f = els.createImage.files && els.createImage.files[0];
+/* ===== 视图切换：主页 ↔ 注册页 ===== */
+function showRegister() {
+  document.querySelector(".screen").classList.add("hidden");
+  els.registerView.classList.remove("hidden");
+}
+function showMain() {
+  els.registerView.classList.add("hidden");
+  document.querySelector(".screen").classList.remove("hidden");
+}
+els.myProfileBtn.addEventListener("click", showRegister);
+els.registerBack.addEventListener("click", showMain);
+
+/* ===== 注册自己（成为候选人，异步预计算） ===== */
+let _regPhotoB64 = "";
+els.regImageBtn.addEventListener("click", () => els.regImage.click());
+els.regImage.addEventListener("change", () => {
+  const f = els.regImage.files && els.regImage.files[0];
   if (!f) return;
-  els.createPhotoName.textContent = f.name;
+  els.regPhotoName.textContent = f.name;
   const r = new FileReader();
   r.onload = (ev) => {
     const url = String(ev.target.result || "");
     const i = url.indexOf(",");
-    _createPhotoB64 = i >= 0 ? url.slice(i + 1) : url;
+    _regPhotoB64 = i >= 0 ? url.slice(i + 1) : url;
   };
   r.readAsDataURL(f);
 });
-els.createBtn.addEventListener("click", async () => {
-  if (!_createPhotoB64) {
-    els.createMsg.textContent = "请先上传候选人照片";
-    els.createMsg.classList.remove("hidden");
+els.regSubmit.addEventListener("click", async () => {
+  if (!_regPhotoB64) {
+    els.regMsg.textContent = "请先上传你的照片";
+    els.regMsg.classList.remove("hidden");
     return;
   }
-  els.createBtn.disabled = true;
-  els.createBtn.textContent = "创建中…";
+  els.regSubmit.disabled = true;
+  els.regSubmit.textContent = "注册中…";
   try {
     const res = await fetch("/api/candidate/create", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name: els.createName.value.trim(),
-        age: els.createAge.value.trim(),
-        city: els.createCity.value.trim(),
-        photo: _createPhotoB64,
+        name: els.regName.value.trim(),
+        age: els.regAge.value.trim(),
+        city: els.regCity.value.trim(),
+        bio: els.regBio.value.trim(),
+        photo: _regPhotoB64,
       }),
     });
     const data = await res.json();
     if (data.ok) {
-      els.createMsg.textContent = "✓ " + data.msg + "（ID: " + data.id + "，状态: " + statusLabel(data.analysis_status) + "）。后台异步分析中，下次匹配会用 ta 的预计算特征。";
+      els.regMsg.textContent = "✓ " + data.msg + "（状态: " + statusLabel(data.analysis_status) + "）。你已进入候选人池，后台正在分析你的照片，3 秒后回到主页。";
+      els.regMsg.classList.remove("hidden");
+      setTimeout(showMain, 3000);
     } else {
-      els.createMsg.textContent = "创建失败";
+      els.regMsg.textContent = "注册失败";
+      els.regMsg.classList.remove("hidden");
     }
-    els.createMsg.classList.remove("hidden");
   } catch (e) {
-    els.createMsg.textContent = "出错：" + e;
-    els.createMsg.classList.remove("hidden");
+    els.regMsg.textContent = "出错：" + e;
+    els.regMsg.classList.remove("hidden");
   } finally {
-    els.createBtn.disabled = false;
-    els.createBtn.textContent = "创建";
+    els.regSubmit.disabled = false;
+    els.regSubmit.textContent = "注册";
   }
 });

@@ -138,22 +138,23 @@ class CreateBody(BaseModel):
     name: str = ""
     age: Any = None
     city: str = ""
+    bio: str = ""
     photo: str = ""  # base64，不带 data: 前缀
 
 
 @app.post("/api/candidate/create")
 async def create_candidate(body: CreateBody):
-    """创建候选人 → 立即返回成功 → 后台异步 vision 分析照片（预计算 attributes）。
+    """注册自己成为候选人 → 立即返回成功 → 后台异步 vision 分析照片（预计算 attributes）。
 
-    架构（传统 C 端思想）：写入即时反馈，分析异步（模拟消息队列），不阻塞创建。
+    架构（传统 C 端思想）：写入即时反馈，分析异步（模拟消息队列），不阻塞注册。
     后台 _analyze 用 asyncio.to_thread 跑同步 vision，不阻塞 event loop。
     """
-    cand = candidate_store.create(body.name, body.age, body.city, body.photo)
+    cand = candidate_store.create(body.name, body.age, body.city, body.photo, body.bio)
     return {
         "ok": True,
         "id": cand["id"],
         "status": "created",
-        "msg": "创建成功，AI 正在分析照片",
+        "msg": "注册成功，AI 正在分析你的照片",
         "analysis_status": cand["analysis_status"],
     }
 

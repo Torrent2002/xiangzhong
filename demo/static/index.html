@@ -19,7 +19,10 @@
     <div class="screen">
       <!-- 品牌区 -->
       <header class="brand">
-        <h1>相中</h1>
+        <div class="brand-row">
+          <h1>相中</h1>
+          <button id="myProfileBtn" class="link-btn" type="button">我的资料</button>
+        </div>
         <p class="tagline">你说不清的喜欢，AI 帮你找得到。</p>
       </header>
 
@@ -36,23 +39,6 @@
           <span class="ref-hint" id="refHint">让 AI 看照片反推理想型</span>
         </div>
         <button id="matchBtn" class="primary-btn">AI 帮我找</button>
-      </section>
-
-      <!-- 创建候选人区（演示异步预计算：创建即时返回，后台分析） -->
-      <section class="create-area">
-        <details>
-          <summary>＋ 创建候选人（演示异步预计算）</summary>
-          <div class="create-form">
-            <input type="file" id="createImage" accept="image/*" hidden />
-            <button class="ref-btn" id="createImageBtn" type="button">📷 上传候选人照片</button>
-            <span class="create-photo-name" id="createPhotoName"></span>
-            <input type="text" id="createName" placeholder="姓名" />
-            <input type="text" id="createAge" placeholder="年龄" />
-            <input type="text" id="createCity" placeholder="城市" />
-            <button id="createBtn" class="primary-btn" type="button">创建</button>
-            <div class="create-msg hidden" id="createMsg"></div>
-          </div>
-        </details>
       </section>
 
       <!-- 结果区 -->
@@ -84,6 +70,26 @@
         <div class="suggestion hidden" id="suggestion"></div>
       </section>
     </div>
+
+    <!-- 注册页（独立视图：注册自己成为候选人） -->
+    <section class="register-view hidden" id="registerView">
+      <div class="register-header">
+        <button class="back-btn" id="registerBack" type="button">‹ 返回</button>
+        <span class="register-title">完善我的资料</span>
+      </div>
+      <div class="register-body">
+        <p class="register-tip">注册你的信息与照片，你将进入候选人池被别人匹配。照片由 AI 异步分析，不阻塞注册。</p>
+        <input type="file" id="regImage" accept="image/*" hidden />
+        <button class="ref-btn" id="regImageBtn" type="button">📷 上传我的照片</button>
+        <span class="reg-photo-name" id="regPhotoName"></span>
+        <input type="text" id="regName" placeholder="姓名" />
+        <input type="text" id="regAge" placeholder="年龄" />
+        <input type="text" id="regCity" placeholder="城市" />
+        <textarea id="regBio" rows="2" placeholder="一句话介绍自己"></textarea>
+        <button id="regSubmit" class="primary-btn" type="button">注册</button>
+        <div class="create-msg hidden" id="regMsg"></div>
+      </div>
+    </section>
 
     <!-- 候选详情面板（覆盖在手机框内） -->
     <div class="detail-overlay hidden" id="detailOverlay">

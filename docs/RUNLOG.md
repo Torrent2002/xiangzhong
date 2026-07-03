@@ -83,3 +83,22 @@ GET /api/implicit/suggest
 **要点**：用户嘴上没提脸型，但行为暴露出偏好方脸——AI 主动发现并提示。这正是「隐性偏好」的核心卖点。
 
 > 设计细节：显性提过的字段不再作为隐性发现对象（避免重复），所以演示时显性描述要留 1-2 个维度不提，才能触发隐性反推。详见 `docs/architecture.md`。
+
+---
+
+## 3. AI 模式（配 key · deepseek-chat）
+
+配置 `OPENAI_API_KEY` + `OPENAI_BASE_URL=https://api.deepseek.com` + `MODEL=deepseek-chat` 后，角标变「AI 模式」，连测 3 次稳定走真 LLM：
+
+```
+GET /api/status → {"mode":"AI 模式","model":"deepseek-chat","available":true}
+
+POST /api/explicit/match {"text":"温柔、不戴眼镜、瓜子脸、文艺风"}  （连测 3 次）
+  #1 intent.source=ai | top=林同学 | score=0.96 | score_source=ai_blend
+  #2 intent.source=ai | top=林同学 | score=0.92 | score_source=ai_blend
+  #3 intent.source=ai | top=林同学 | score=0.96 | score_source=ai_blend
+```
+
+**对比兜底模式**：意图解析从关键词匹配升级为 LLM 语义理解；匹配分从纯结构化（1.0）变为 AI 语义分 + 结构化加权（ai_blend，0.9x）；推荐理由从模板变为 LLM 自然语言。
+
+> 选型说明：`deepseek-v4-flash` 间歇性返回空 content（导致偶发降级到兜底），已换 `deepseek-chat`（稳定）。DeepSeek 不提供 embedding 端点，显性语义分走 LLM 打分路径（非向量），失败时仍降级结构化打分。

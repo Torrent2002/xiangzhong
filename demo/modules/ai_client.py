@@ -20,6 +20,7 @@
 import json
 import os
 import time
+import httpx
 from typing import Any
 
 # openai SDK 在真实路径才 import；没装也不影响兜底模式启动。
@@ -36,6 +37,8 @@ except Exception as e:  # pragma: no cover - 仅在缺包时触发
 
 # 单次调用超时（秒）。需求 §5.3：15s。
 _TIMEOUT = 15.0
+# vision 调用超时（秒）：图片体积大，给宽点。
+_VISION_TIMEOUT = 20.0
 # 失败重试次数（不含首次）。需求 §5.3：重试 1 次。
 _RETRIES = 1
 
@@ -120,6 +123,37 @@ def _model() -> str:
     return _env("MODEL", "gpt-4o-mini")
 
 
+def _vision_model() -> str:
+    """vision 模型名。默认回落到 MODEL，但 deepseek-chat 不支持图片，需显式配 VISION_MODEL。"""
+    return _env("VISION_MODEL", _model())
+
+
+def is_vision_available() -> bool:
+    """是否可调用多模态 vision 模型。
+
+    判据：装了 openai SDK + 有 key + VISION_MODEL 显式非空。
+    注意：deepseek-chat 不支持图片。VISION_MODEL 留空 → 返回 False（前端禁用照片按钮，
+    提示「未配置 vision 模型」）。要启用照片识别，必须在 .env 显式设 VISION_MODEL
+    为支持 vision 的模型（qwen-vl-plus / glm-4v-flash / gpt-4o 等）。
+    """
+    if not _OPENAI_SDK_OK:
+        return False
+    if not _env("OPENAI_API_KEY"):
+        return False
+    if not _env("VISION_MODEL"):
+        return False
+    return True
+
+
+def _get_vision_client():
+    """惰性构建一个专用于 vision 的客户端（独立超时）。
+
+    与 _get_client 同源 OpenAI 实例；区别仅在 timeout（图片调用更慢）。
+    openai SDK 的 client.timeout 可在单次 create 时覆盖，这里直接复用主 client。
+    """
+    return _get_client()
+
+
 def _safe_chat(messages: list[dict], json_mode: bool = False) -> str | None:
     """真实 chat completion，带超时 + 重试 1 次。任何异常都返回 None。"""
     client = _get_client()
@@ -182,6 +216,44 @@ def complete_chat(messages: list[dict], json_mode: bool = False) -> str | None:
     return _safe_chat(messages, json_mode=json_mode)
 
 
+def vision_analyze(image_b64: str, prompt: str, json_mode: bool = False) -> str | None:
+    """多模态 vision 调用：用 httpx 直接请求 OpenAI 兼容 vision 端点。
+
+    不经 openai SDK 的同步 client（其在 uvicorn 线程池里对图片调用会卡死），
+    改用 httpx 同步请求，超时严格生效，线程池 / 独立进程行为一致。
+    模型取 VISION_MODEL（deepseek-chat 不支持图片，需配 doubao-seed-2.0-pro / qwen-vl / glm-4v / gpt-4o）。
+    超时 _VISION_TIMEOUT、重试 _RETRIES 次；无 key / 失败 → 返回 None（调用方走兜底）。
+    """
+    if not is_vision_available():
+        return None
+    b64 = (image_b64 or "").strip()
+    if not b64:
+        return None
+    base_url = (_env("OPENAI_BASE_URL") or "https://api.openai.com/v1").rstrip("/")
+    url = f"{base_url}/chat/completions"
+    headers = {"Authorization": f"Bearer {_env('OPENAI_API_KEY')}"}
+    body: dict[str, Any] = {
+        "model": _vision_model(),
+        "messages": [{"role": "user", "content": [
+            {"type": "text", "text": prompt or ""},
+            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
+        ]}],
+        "temperature": 0.2,
+        "max_tokens": 200,
+    }
+    if json_mode:
+        body["response_format"] = {"type": "json_object"}
+    for attempt in range(_RETRIES + 1):
+        try:
+            resp = httpx.post(url, headers=headers, json=body, timeout=_VISION_TIMEOUT)
+            resp.raise_for_status()
+            content = resp.json()["choices"][0]["message"]["content"]
+            return content.strip() if content else None
+        except Exception:
+            continue
+    return None
+
+
 def embed(text: str) -> list[float] | None:
     """文本向量（用于显性语义打分）。
 
@@ -223,4 +295,6 @@ def status() -> dict:
         "base_url_set": bool(_env("OPENAI_BASE_URL")),
         "sdk_ok": _OPENAI_SDK_OK,
         "import_err": _IMPORT_ERR,
+        "vision_available": is_vision_available(),
+        "vision_model": _vision_model() if is_vision_available() else None,
     }

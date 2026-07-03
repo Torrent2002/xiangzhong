@@ -120,6 +120,74 @@ def parse_intent(text: str) -> dict:
     return intent
 
 
+# ===== parse_intent_from_image（多模态参考图通道）=====
+
+_VISION_SYSTEM_PROMPT = (
+    "你是相亲平台「相中」的理想型照片解析器。看一张人物照片，提取其外观特征并"
+    "标准化到候选字段的可选值，输出纯 JSON。\n"
+    "字段与取值：\n"
+    "  glasses: bool，true=戴眼镜 false=不戴眼镜\n"
+    "  faceShape: 瓜子脸 / 圆脸 / 方脸 / 鹅蛋脸\n"
+    "  style: 文艺 / 运动 / 商务 / 街头 / 极简\n"
+    "  vibe: 温柔 / 活泼 / 高冷 / 阳光 / 知性\n"
+    "判断依据：是否戴眼镜看面部；脸型看下颌与轮廓；style 看穿搭；vibe 看整体气质与表情。\n"
+    "看不清或无法判断的字段填 null（不要瞎猜）。只返回纯 JSON，不要解释、不要 markdown 围栏。"
+)
+
+
+def parse_intent_from_image(image_b64: str) -> dict:
+    """从参考照片解析结构化意图（与文本 parse_intent 同 schema）。
+
+    AI vision 路：vision_analyze 让模型看照片抽 JSON，再归一化到候选字段可选值。
+    vision 不可用 / 调用失败 → 返回 {"source":"none","error":"vision_unavailable"}，
+    调用方据 source="none" 走文本兜底或提示用户。
+
+    返回 {glasses, faceShape, style, vibe, raw_text, source, [error]}。
+      - source: "ai" | "none"
+    """
+    if not ai_client.is_vision_available():
+        return {"source": "none", "error": "vision_unavailable"}
+
+    out = ai_client.vision_analyze(image_b64, _VISION_SYSTEM_PROMPT, json_mode=True)
+    if not out:
+        return {"source": "none", "error": "vision_unavailable"}
+
+    raw = out.strip()
+    if raw.startswith("```"):
+        raw = raw.strip("`")
+        raw = raw.split("\n", 1)[-1] if raw.lower().startswith("json") else raw
+    try:
+        data = json.loads(raw)
+    except Exception:
+        return {"source": "none", "error": "vision_unavailable"}
+    if not isinstance(data, dict):
+        return {"source": "none", "error": "vision_unavailable"}
+
+    intent = {
+        "glasses": _normalize_glasses(data.get("glasses")),
+        "faceShape": _normalize_choice(data.get("faceShape"), fallback.FACE_SHAPES),
+        "style": _normalize_choice(
+            data.get("style"), fallback.STYLES + list(fallback.STYLE_ALIASES.values())
+        ),
+        "vibe": _normalize_choice(
+            data.get("vibe"), fallback.VIBES + list(fallback.VIBE_ALIASES.values())
+        ),
+    }
+    # raw_text 用归一化后的字段拼一句自然描述，供 _semantic_score 当作用户描述、
+    # 也供隐性 suggest 做「嘴上说 X」对照（图片场景下「嘴上说」即「照片里看出的」）。
+    parts = []
+    if intent["glasses"] is True:
+        parts.append("戴眼镜")
+    elif intent["glasses"] is False:
+        parts.append("不戴眼镜")
+    for f in ("faceShape", "style", "vibe"):
+        if intent.get(f):
+            parts.append(intent[f])
+    intent["raw_text"] = "、".join(parts) if parts else "（参考照片未识别到明确维度）"
+    intent["source"] = "ai"
+    return intent
+
+
 # ===== match =====
 
 _SYSTEM_SCORE_PROMPT = (
@@ -171,22 +239,13 @@ def match(intent: dict, candidates: list[dict] | None = None) -> list[dict]:
     scored: list[dict] = []
     for c in candidates:
         struct_score, hits, diffs = fallback.match_score(intent or {}, c)
-        sem_score: float | None = None
-        ai_reason: str | None = None
-        if use_ai:
-            sem_score, ai_reason = _semantic_score(text, c)
-
-        if sem_score is not None:
-            final = 0.6 * struct_score + 0.4 * sem_score
-            score_source = "ai_blend"
-        else:
-            final = struct_score
-            score_source = "structured"
+        # 不再逐候选调 LLM 语义打分（原 12 次 LLM ~70s，且 sem_score 常返固定值不可靠）。
+        # 速度优先：只用结构化分 + 模板理由。意图解析仍走 AI（source=ai），透明化命中/差异足够。
+        sem_score = None
+        final = struct_score
+        score_source = "structured"
 
         reasons = fallback.why_reasons(intent or {}, c, hits, diffs)
-        if ai_reason:
-            # AI 自然语言理由放最前
-            reasons = [ai_reason] + reasons
 
         scored.append({
             "candidate": c,
@@ -202,6 +261,26 @@ def match(intent: dict, candidates: list[dict] | None = None) -> list[dict]:
     # 排序：分数降序，平局按命中维度数（更"全中"的靠前）
     scored.sort(key=lambda x: (x["score"], len(x["hits"])), reverse=True)
     return scored[:3]
+
+
+def why_for_candidate(intent: dict | None, candidate: dict) -> list[str]:
+    """为单个 candidate 生成「为什么推荐」理由，复用 match() 内部逻辑。
+
+    供详情页等"非打分排序"场景使用：给定一个 intent（可能来自显性文本/图片，
+    或 implicit 的 last_intent）与单个 candidate，返回理由列表。
+    intent 为 None / 空时退化为兜底模板（"整体气质相近 + bio"）。
+    """
+    intent = intent or {}
+    text = intent.get("raw_text", "")
+    use_ai = ai_client.is_available() and bool(text)
+    struct_score, hits, diffs = fallback.match_score(intent, candidate)
+
+    reasons = fallback.why_reasons(intent, candidate, hits, diffs)
+    if use_ai:
+        _, ai_reason = _semantic_score(text, candidate)
+        if ai_reason:
+            reasons = [ai_reason] + reasons
+    return reasons
 
 
 def load_candidates() -> list[dict]:

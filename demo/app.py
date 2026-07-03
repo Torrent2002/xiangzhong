@@ -23,6 +23,8 @@ AVATAR_DIR = BASE_DIR / "avatars"
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse
+from fastapi.concurrency import run_in_threadpool
+from pydantic import BaseModel
 from fastapi.staticfiles import StaticFiles
 
 from modules import ai_client, explicit_preference, implicit_preference
@@ -59,14 +61,63 @@ async def explicit_match(request: Request):
     except Exception:
         data = {}
     text = (data or {}).get("text", "")
-    intent = explicit_preference.parse_intent(text)
+    intent = await run_in_threadpool(explicit_preference.parse_intent, text)
     # 回写最近 intent，供隐性 suggest 做"嘴上说 X"对照。
     implicit_preference.set_last_intent(intent)
+    matches = await run_in_threadpool(explicit_preference.match, intent)
+    return {
+        "intent": intent,
+        "matches": matches,
+        "mode": ai_client.status()["mode"],
+    }
+
+
+class ImageBody(BaseModel):
+    image: str = ""
+
+
+@app.post("/api/explicit/match_image")
+def explicit_match_image(body: ImageBody):
+    """参考照片 → 意图（vision）→ 排序候选 + "为什么推荐"。
+
+    sync def：FastAPI 自动在线程池跑，同步 LLM 调用不阻塞 event loop、timeout 生效。
+    body: {"image": "<base64 不带 data: 前缀>"}。
+    vision 未配置/失败时 intent.source="none"，matches 仍按空 intent 兜底（结构化打分=0，但列表非空）。
+    """
+    intent = explicit_preference.parse_intent_from_image(body.image)
+    # 仅当 vision 成功解析时回写 last_intent（避免图片失败污染隐性对照）。
+    if intent.get("source") == "ai":
+        implicit_preference.set_last_intent(intent)
     matches = explicit_preference.match(intent)
     return {
         "intent": intent,
         "matches": matches,
         "mode": ai_client.status()["mode"],
+        "vision_available": ai_client.is_vision_available(),
+    }
+
+
+@app.get("/api/candidate/{cid}")
+def candidate_detail(cid: str):
+    """单个候选详情：完整 bio + 全部 attributes；若当前有 last_intent，附匹配理由。
+
+    供详情面板使用：姓名/年龄/城市/bio/attributes + "为什么推荐"。
+    无 last_intent 时 reasons=[]，前端不显示理由区。
+    """
+    cid = (cid or "").strip()
+    candidates = explicit_preference.load_candidates()
+    cand = next((c for c in candidates if c.get("id") == cid), None)
+    if cand is None:
+        return {"ok": False, "error": "not_found", "id": cid}
+    last_intent = implicit_preference.get_last_intent()
+    reasons: list[str] = []
+    if last_intent:
+        reasons = explicit_preference.why_for_candidate(last_intent, cand)
+    return {
+        "ok": True,
+        "candidate": cand,
+        "reasons": reasons,
+        "has_intent": last_intent is not None,
     }
 
 

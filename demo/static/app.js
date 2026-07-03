@@ -9,6 +9,9 @@ const els = {
   desc: $("desc"),
   examples: $("examples"),
   matchBtn: $("matchBtn"),
+  refBtn: $("refBtn"),
+  refImage: $("refImage"),
+  refHint: $("refHint"),
   emptyState: $("emptyState"),
   loading: $("loading"),
   result: $("result"),
@@ -18,6 +21,11 @@ const els = {
   suggestBtn: $("suggestBtn"),
   suggestion: $("suggestion"),
   modeBadge: $("modeBadge"),
+  detailOverlay: $("detailOverlay"),
+  detailMask: $("detailMask"),
+  detailPanel: $("detailPanel"),
+  detailBody: $("detailBody"),
+  detailClose: $("detailClose"),
 };
 
 function show(el) { el.classList.remove("hidden"); }
@@ -30,7 +38,8 @@ function esc(s) {
   }[c]));
 }
 
-/* ===== 模式角标 ===== */
+/* ===== 模式角标 + vision 可用态 ===== */
+let visionAvailable = false;
 async function refreshMode() {
   try {
     const res = await fetch("/api/status");
@@ -45,8 +54,25 @@ async function refreshMode() {
       badge.classList.remove("ai");
       badge.title = "本地兜底模式（无 API key，AI 调用走本地逻辑，不报错）";
     }
+    visionAvailable = !!data.vision_available;
+    applyVisionState();
   } catch (e) {
     els.modeBadge.textContent = "本地兜底模式";
+    visionAvailable = false;
+    applyVisionState();
+  }
+}
+
+function applyVisionState() {
+  const btn = els.refBtn;
+  if (visionAvailable) {
+    btn.disabled = false;
+    btn.textContent = "📷 上传理想型照片";
+    els.refHint.textContent = "让 AI 看照片反推理想型";
+  } else {
+    btn.disabled = true;
+    btn.textContent = "📷 未配置 vision 模型";
+    els.refHint.textContent = "需在 .env 配 VISION_MODEL（如 qwen-vl-plus / glm-4v-flash / gpt-4o）";
   }
 }
 refreshMode();
@@ -58,6 +84,72 @@ els.examples.addEventListener("click", (e) => {
   els.desc.value = chip.dataset.text;
   els.desc.focus();
 });
+
+/* ===== 参考照片链路（多模态 vision） ===== */
+els.refBtn.addEventListener("click", () => {
+  if (els.refBtn.disabled) return;
+  els.refImage.click();
+});
+
+els.refImage.addEventListener("change", () => {
+  const file = els.refImage.files && els.refImage.files[0];
+  if (!file) return;
+  if (!visionAvailable) {
+    // 双保险：即便按钮被启用，也再校验一次。
+    applyVisionState();
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = async (ev) => {
+    // FileReader 结果形如 data:image/jpeg;base64,xxxx，去掉前缀只留 b64。
+    const dataUrl = String(ev.target.result || "");
+    const comma = dataUrl.indexOf(",");
+    const b64 = comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl;
+    await runMatchImage(b64);
+    // 清空，便于再次选同一张图触发 change。
+    els.refImage.value = "";
+  };
+  reader.readAsDataURL(file);
+});
+
+async function runMatchImage(b64) {
+  hide(els.emptyState);
+  hide(els.result);
+  els.loading.classList.remove("hidden");
+  setLoadingText("AI 正在看照片…");
+  const minDelay = delay(600);
+  try {
+    const res = await fetch("/api/explicit/match_image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image: b64 }),
+    });
+    const data = await res.json();
+    await minDelay;
+    if (data.intent && data.intent.source === "none") {
+      // vision 不可用 / 失败：温和提示，不报错。
+      els.result.innerHTML =
+        '<p class="empty-sub">照片识别暂不可用（' + esc(data.intent.error || "vision_unavailable") +
+        "）。可在 .env 配置 VISION_MODEL 后重试，或直接文字描述 ↑</p>";
+      show(els.result);
+      refreshMode();
+      return;
+    }
+    renderResult(data.intent, data.matches);
+    refreshMode();
+  } catch (err) {
+    els.result.innerHTML = '<p class="empty-sub">出错了：' + esc(err) + "（请确认后端已启动）</p>";
+    show(els.result);
+  } finally {
+    hide(els.loading);
+    setLoadingText("AI 正在理解你的描述…");
+  }
+}
+
+function setLoadingText(txt) {
+  const p = els.loading.querySelector("p");
+  if (p) p.textContent = txt;
+}
 
 /* ===== 显性偏好链路 ===== */
 els.matchBtn.addEventListener("click", async () => {
@@ -82,10 +174,8 @@ els.matchBtn.addEventListener("click", async () => {
     });
     const data = await res.json();
     await minDelay;
-    renderIntent(data.intent);
-    renderCards(data.matches);
+    renderResult(data.intent, data.matches);
     refreshMode();
-    show(els.result);
   } catch (err) {
     els.result.innerHTML = '<p class="empty-sub">出错了：' + esc(err) + "（请确认后端已启动）</p>";
     show(els.result);
@@ -93,6 +183,12 @@ els.matchBtn.addEventListener("click", async () => {
     hide(els.loading);
   }
 });
+
+function renderResult(intent, matches) {
+  renderIntent(intent);
+  renderCards(matches);
+  show(els.result);
+}
 
 function renderIntent(intent) {
   const pills = [];
@@ -109,6 +205,9 @@ function renderIntent(intent) {
   if (intent.source === "ai") {
     tag.textContent = "AI 解析";
     tag.classList.add("ai");
+  } else if (intent.source === "none") {
+    tag.textContent = "未识别";
+    tag.classList.remove("ai");
   } else {
     tag.textContent = "关键词解析（兜底）";
     tag.classList.remove("ai");
@@ -134,6 +233,7 @@ function renderCards(matches) {
             '<span class="meta">' + esc(attrLine(a)) + "</span>" +
             '<span class="score">匹配度 ' + Math.round((m.score || 0) * 100) + "%</span>" +
           "</div>" +
+          '<span class="card-more" title="查看详情">›</span>' +
         "</div>" +
         '<div class="why"><b>为什么推荐</b><ul>' +
           m.reasons.map((r) => "<li>" + esc(r) + "</li>").join("") +
@@ -178,11 +278,101 @@ function attachDwellTracking() {
 }
 
 els.cards.addEventListener("click", async (e) => {
+  // 1) ♡ / ✕ 按钮：上报行为
+  const btn = e.target.closest("button[data-cid]");
+  if (btn) {
+    const card = btn.closest(".card");
+    if (card.dataset.acted) return; // 同卡只记一次 like/pass
+    card.dataset.acted = "1";
+    btn.classList.add("active");
+    try {
+      await fetch("/api/implicit/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          candidateId: btn.dataset.cid,
+          action: btn.dataset.action,
+          dwellMs: null,
+        }),
+      });
+    } catch (err) {
+      // 静默失败，不阻塞体验
+    }
+    return;
+  }
+  // 2) 点击卡片其它区域（头像/名字/›/why）：打开详情
+  const card = e.target.closest(".card");
+  if (card && card.dataset.cid) {
+    openDetail(card.dataset.cid);
+  }
+});
+
+/* ===== 候选详情面板 ===== */
+async function openDetail(cid) {
+  // 立即弹出骨架，避免点完无反馈。
+  els.detailBody.innerHTML =
+    '<div class="detail-loading"><div class="spinner"></div><p>加载中…</p></div>';
+  show(els.detailOverlay);
+  try {
+    const res = await fetch("/api/candidate/" + encodeURIComponent(cid));
+    const data = await res.json();
+    if (!data.ok || !data.candidate) {
+      els.detailBody.innerHTML = '<p class="empty-sub">找不到该候选人</p>';
+      return;
+    }
+    renderDetail(data.candidate, data.reasons || [], data.has_intent);
+  } catch (err) {
+    els.detailBody.innerHTML = '<p class="empty-sub">出错了：' + esc(err) + "</p>";
+  }
+}
+
+function renderDetail(c, reasons, hasIntent) {
+  const a = c.attributes || {};
+  const attrRows = [
+    ["戴眼镜", a.glasses === true ? "是" : a.glasses === false ? "否" : "—"],
+    ["脸型", a.faceShape || "—"],
+    ["风格", a.style || "—"],
+    ["气质", a.vibe || "—"],
+  ];
+  els.detailBody.innerHTML =
+    '<div class="detail-hero">' +
+      '<img src="/' + esc(c.photo) + '" alt="' + esc(c.name) + '" />' +
+      '<div class="detail-name">' + esc(c.name) + " · " + esc(c.age) + " · " + esc(c.city) + "</div>" +
+    "</div>" +
+    '<div class="detail-section"><div class="detail-sec-title">关于 TA</div>' +
+      '<p class="detail-bio">' + esc(c.bio || "") + "</p>" +
+    "</div>" +
+    '<div class="detail-section"><div class="detail-sec-title">特征</div>' +
+      '<div class="detail-attrs">' +
+        attrRows.map((r) =>
+          '<div class="attr-row"><span class="attr-k">' + esc(r[0]) + "</span>" +
+          '<span class="attr-v">' + esc(r[1]) + "</span></div>"
+        ).join("") +
+      "</div>" +
+    "</div>" +
+    (hasIntent && reasons.length
+      ? '<div class="detail-section detail-why"><div class="detail-sec-title">为什么推荐</div><ul>' +
+        reasons.map((r) => "<li>" + esc(r) + "</li>").join("") + "</ul></div>"
+      : "") +
+    '<div class="detail-actions">' +
+      '<button class="btn-like" data-cid="' + esc(c.id) + '" data-action="like">♡ 心动</button>' +
+      '<button class="btn-pass" data-cid="' + esc(c.id) + '" data-action="pass">✕ 跳过</button>' +
+    "</div>";
+}
+
+function closeDetail() {
+  hide(els.detailOverlay);
+}
+
+els.detailClose.addEventListener("click", closeDetail);
+els.detailMask.addEventListener("click", closeDetail);
+
+// 详情面板内 ♡ / ✕ 上报（与卡片一致）
+els.detailPanel.addEventListener("click", async (e) => {
   const btn = e.target.closest("button[data-cid]");
   if (!btn) return;
-  const card = btn.closest(".card");
-  if (card.dataset.acted) return; // 同卡只记一次 like/pass
-  card.dataset.acted = "1";
+  if (btn.dataset.acted) return;
+  btn.dataset.acted = "1";
   btn.classList.add("active");
   try {
     await fetch("/api/implicit/track", {
@@ -195,8 +385,10 @@ els.cards.addEventListener("click", async (e) => {
       }),
     });
   } catch (err) {
-    // 静默失败，不阻塞体验
+    // 静默
   }
+  // 点后关闭详情（可改"停留"，这里关掉，回到列表继续浏览）。
+  closeDetail();
 });
 
 /* ===== 隐性偏好链路：主动提示 ===== */

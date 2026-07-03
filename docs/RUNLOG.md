@@ -86,19 +86,29 @@ GET /api/implicit/suggest
 
 ---
 
-## 3. AI 模式（配 key · deepseek-chat）
+## 3. AI 模式（配 key · doubao-seed-2.0-pro，文本 + vision 同一多模态模型）
 
-配置 `OPENAI_API_KEY` + `OPENAI_BASE_URL=https://api.deepseek.com` + `MODEL=deepseek-chat` 后，角标变「AI 模式」，连测 3 次稳定走真 LLM：
+配置 `OPENAI_API_KEY` + `OPENAI_BASE_URL=https://ark.cn-beijing.volces.com/api/coding/v3` + `MODEL=doubao-seed-2.0-pro` + `VISION_MODEL=doubao-seed-2.0-pro`。角标变「AI 模式」。doubao-seed-2.0-pro 是多模态，文本意图解析 + 照片识别用同一套配置。
 
+### 文本链路
 ```
-GET /api/status → {"mode":"AI 模式","model":"deepseek-chat","available":true}
-
-POST /api/explicit/match {"text":"温柔、不戴眼镜、瓜子脸、文艺风"}  （连测 3 次）
-  #1 intent.source=ai | top=林同学 | score=0.96 | score_source=ai_blend
-  #2 intent.source=ai | top=林同学 | score=0.92 | score_source=ai_blend
-  #3 intent.source=ai | top=林同学 | score=0.96 | score_source=ai_blend
+POST /api/explicit/match {"text":"温柔、不戴眼镜、瓜子脸、文艺风"}
+→ intent.source=ai | top=林同学 | score=1.0 | score_source=structured
 ```
+意图解析走 LLM（source=ai）；匹配用结构化打分（命中字段 / 非空字段）。
 
-**对比兜底模式**：意图解析从关键词匹配升级为 LLM 语义理解；匹配分从纯结构化（1.0）变为 AI 语义分 + 结构化加权（ai_blend，0.9x）；推荐理由从模板变为 LLM 自然语言。
+### 照片分析链路（参考图通道）
+上传一张圆脸、不戴眼镜、笑容的测试图：
+```
+POST /api/explicit/match_image {"image":"<base64>"}
+耗时 39.4s | status:200 | source:ai | mode:AI 模式
+intent: {glasses:false, faceShape:"圆脸", style:null, vibe:"温柔"}
+  蒋同学 score=1.0 src=structured | 命中你的描述：不戴眼镜、圆脸、温柔 ✓
+  林同学 score=0.667 | 命中你的描述：不戴眼镜、温柔 ✓
+```
+vision 真识别出圆脸 / 不戴眼镜 / 温柔，匹配透明化命中。`style=null`（测试图无穿搭，vision 诚实返 null 不瞎猜）。
 
-> 选型说明：`deepseek-v4-flash` 间歇性返回空 content（导致偶发降级到兜底），已换 `deepseek-chat`（稳定）。DeepSeek 不提供 embedding 端点，显性语义分走 LLM 打分路径（非向量），失败时仍降级结构化打分。
+> 工程取舍：
+> - **match 去掉逐候选 LLM 语义打分**：原对 12 个候选各调一次 LLM 语义分（~70s，且 sem_score 常返固定值不可靠），改纯结构化打分（速度优先，意图解析仍走 AI）。
+> - **vision 不经 openai SDK 同步 client**：其在 uvicorn 线程池里对图片调用会卡死（async def + 同步阻塞 + timeout 不生效），改用 httpx 直接请求豆包端点，超时严格生效。
+> - **选型**：deepseek-chat 不支持图片；doubao-seed-2.0-pro 多模态，文本 + vision 都可用，已实测（deepseek-v4-flash 间歇性返空 content 已弃用）。

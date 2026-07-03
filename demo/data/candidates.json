@@ -1,0 +1,110 @@
+[
+  {
+    "id": "c01",
+    "name": "林同学",
+    "age": 26,
+    "city": "上海",
+    "photo": "avatars/c01.svg",
+    "attributes": { "glasses": false, "faceShape": "瓜子脸", "style": "文艺", "vibe": "温柔" },
+    "bio": "一个安静、喜欢看展和旧书店的女生。"
+  },
+  {
+    "id": "c02",
+    "name": "陈同学",
+    "age": 27,
+    "city": "北京",
+    "photo": "avatars/c02.svg",
+    "attributes": { "glasses": true, "faceShape": "鹅蛋脸", "style": "极简", "vibe": "知性" },
+    "bio": "做设计，黑白灰三色主义。"
+  },
+  {
+    "id": "c03",
+    "name": "苏同学",
+    "age": 25,
+    "city": "杭州",
+    "photo": "avatars/c03.svg",
+    "attributes": { "glasses": false, "faceShape": "圆脸", "style": "运动", "vibe": "阳光" },
+    "bio": "周末沿江骑行，笑容很多。"
+  },
+  {
+    "id": "c04",
+    "name": "周同学",
+    "age": 29,
+    "city": "成都",
+    "photo": "avatars/c04.svg",
+    "attributes": { "glasses": false, "faceShape": "方脸", "style": "街头", "vibe": "活泼" },
+    "bio": "滑板和说唱，话多且密。"
+  },
+  {
+    "id": "c05",
+    "name": "黄同学",
+    "age": 28,
+    "city": "上海",
+    "photo": "avatars/c05.svg",
+    "attributes": { "glasses": true, "faceShape": "瓜子脸", "style": "商务", "vibe": "知性" },
+    "bio": "投行，靠咖啡续命。"
+  },
+  {
+    "id": "c06",
+    "name": "赵同学",
+    "age": 24,
+    "city": "广州",
+    "photo": "avatars/c06.svg",
+    "attributes": { "glasses": false, "faceShape": "鹅蛋脸", "style": "文艺", "vibe": "温柔" },
+    "bio": "写诗、养猫、雨天最开心。"
+  },
+  {
+    "id": "c07",
+    "name": "吴同学",
+    "age": 30,
+    "city": "深圳",
+    "photo": "avatars/c07.svg",
+    "attributes": { "glasses": false, "faceShape": "方脸", "style": "运动", "vibe": "高冷" },
+    "bio": "攀岩、少言、眼神很定。"
+  },
+  {
+    "id": "c08",
+    "name": "郑同学",
+    "age": 26,
+    "city": "北京",
+    "photo": "avatars/c08.svg",
+    "attributes": { "glasses": true, "faceShape": "圆脸", "style": "极简", "vibe": "活泼" },
+    "bio": "极简生活博主，断舍离十级。"
+  },
+  {
+    "id": "c09",
+    "name": "王同学",
+    "age": 27,
+    "city": "杭州",
+    "photo": "avatars/c09.svg",
+    "attributes": { "glasses": false, "faceShape": "瓜子脸", "style": "街头", "vibe": "阳光" },
+    "bio": "街拍摄影师，永远在路上。"
+  },
+  {
+    "id": "c10",
+    "name": "冯同学",
+    "age": 31,
+    "city": "成都",
+    "photo": "avatars/c10.svg",
+    "attributes": { "glasses": true, "faceShape": "鹅蛋脸", "style": "商务", "vibe": "知性" },
+    "bio": "律师，逻辑缜密，话不多但句句到位。"
+  },
+  {
+    "id": "c11",
+    "name": "蒋同学",
+    "age": 25,
+    "city": "上海",
+    "photo": "avatars/c11.svg",
+    "attributes": { "glasses": false, "faceShape": "圆脸", "style": "文艺", "vibe": "温柔" },
+    "bio": "插画师，喜欢老电影和旧唱片。"
+  },
+  {
+    "id": "c12",
+    "name": "韩同学",
+    "age": 28,
+    "city": "广州",
+    "photo": "avatars/c12.svg",
+    "attributes": { "glasses": false, "faceShape": "方脸", "style": "极简", "vibe": "高冷" },
+    "bio": "建筑师，线条至上，社交极简。"
+  }
+]

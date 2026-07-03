@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <rect width="200" height="200" rx="20" fill="#d8ead2"/>
+  <!-- 颈部 -->
+  <rect x="90" y="150" width="20" height="30" rx="8" fill="#e7c6a3"/>
+  <!-- 头发后部 -->
+  <ellipse cx="100" cy="104" rx="44" ry="46" fill="#2b2b2b"/>
+  <!-- 头部（按脸型） -->
+  <path d="M100,68 C122,68 130,100 128,122 C126,146 114,158 100,158 C86,158 74,146 72,122 C70,100 78,68 100,68 Z" fill="#f3d4b3"/>
+  <!-- 刘海 -->
+  <path d="M62,100 Q58,66 100,62 Q142,66 138,100 Q120,84 100,84 Q80,84 62,100 Z" fill="#2b2b2b"/>
+  <!-- 眼睛 -->
+  <ellipse cx="86" cy="112" rx="3.4" ry="5" fill="#2b2b2b"/>
+  <ellipse cx="114" cy="112" rx="3.4" ry="5" fill="#2b2b2b"/>
+  <!-- 鼻子 -->
+  <path d="M100,118 q-2,7 2,9" stroke="#c9a98a" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <!-- 眼镜（若戴） -->
+  
+  <!-- 嘴（按 vibe） -->
+  <path d="M88,134 Q100,142 112,134" stroke="#b5654a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>相中 · 演示版 v0.1</title>
+<style>
+  /* ========== 基础重置 ========== */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: PingFang SC, "Helvetica Neue", Arial, sans-serif;
+    color: #1a1a1a;
+    background: #f7f7f7;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* ========== 颜色变量 ========== */
+  :root {
+    --red: #FF2442;
+    --ink: #1a1a1a;
+    --sub: #999;
+    --white: #ffffff;
+    --grey: #f7f7f7;
+    --blue-bg: #E8F0FE;
+    --red-bg: #FDECEE;
+    --line: #ececec;
+  }
+
+  /* ========== 幻灯片容器 ========== */
+  .deck {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+  }
+  .slide {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    padding: 5.5vh 8vw 7vh;
+    display: none;
+    flex-direction: column;
+    background: var(--white);
+    opacity: 0;
+    transition: opacity .35s ease;
+  }
+  .slide.alt { background: var(--grey); }
+  .slide.active { display: flex; opacity: 1; }
+
+  /* ========== 页眉小字：页码 + 导出提示 ========== */
+  .meta {
+    position: fixed;
+    top: 2.2vh;
+    right: 2.5vw;
+    font-size: 13px;
+    color: var(--sub);
+    z-index: 50;
+    letter-spacing: .04em;
+    user-select: none;
+  }
+  .meta .sep { margin: 0 8px; opacity: .5; }
+  .meta .pdf-hint {
+    position: fixed;
+    left: 2.5vw;
+    bottom: 1.8vh;
+    font-size: 12px;
+    color: #c4c4c4;
+    letter-spacing: .02em;
+  }
+
+  /* ========== 通用排版 ========== */
+  .kicker {
+    font-size: 14px;
+    color: var(--red);
+    letter-spacing: .18em;
+    font-weight: 600;
+    margin-bottom: 1.4vh;
+  }
+  .title {
+    font-size: 46px;
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: -.01em;
+    margin-bottom: 3.5vh;
+  }
+  .title .accent { color: var(--red); }
+  .sub-title {
+    font-size: 22px;
+    font-weight: 500;
+    line-height: 1.5;
+    color: #444;
+  }
+  .footer-line {
+    margin-top: auto;
+    padding-top: 2vh;
+    font-size: 15px;
+    color: var(--sub);
+  }
+  .red-line {
+    color: var(--red);
+    font-weight: 600;
+    font-size: 17px;
+  }
+
+  /* ========== P0 封面 ========== */
+  .cover {
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+  .cover .brand {
+    font-size: 110px;
+    font-weight: 800;
+    letter-spacing: .12em;
+    line-height: 1;
+    margin-bottom: 3vh;
+  }
+  .cover .brand .dot { color: var(--red); }
+  .cover .tagline {
+    font-size: 30px;
+    font-weight: 500;
+    color: var(--ink);
+    margin-bottom: 2.4vh;
+    letter-spacing: .02em;
+  }
+  .cover .desc {
+    font-size: 16px;
+    color: var(--sub);
+    letter-spacing: .04em;
+  }
+  .cover .ver {
+    position: absolute;
+    bottom: 5vh;
+    left: 0; right: 0;
+    text-align: center;
+    font-size: 13px;
+    color: #c4c4c4;
+    letter-spacing: .1em;
+  }
+
+  /* ========== P1 问题页 ========== */
+  .cols-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4vw;
+    flex: 1;
+    align-content: start;
+  }
+  .panel-h {
+    font-size: 19px;
+    font-weight: 700;
+    margin-bottom: 2.2vh;
+    padding-bottom: 1vh;
+    border-bottom: 2px solid var(--ink);
+    display: inline-block;
+  }
+  .item {
+    margin-bottom: 2vh;
+    line-height: 1.7;
+    font-size: 17px;
+  }
+  .item .lbl { font-weight: 700; }
+  .item .num {
+    display: inline-block;
+    width: 22px; height: 22px;
+    line-height: 22px;
+    text-align: center;
+    border-radius: 50%;
+    background: var(--ink);
+    color: #fff;
+    font-size: 13px;
+    margin-right: 8px;
+    font-weight: 700;
+  }
+  .scene-box {
+    background: var(--grey);
+    border-radius: 12px;
+    padding: 3vh 2.2vw;
+    line-height: 1.9;
+    font-size: 16.5px;
+  }
+  .scene-box .arrow { color: var(--red); font-weight: 700; margin: 0 4px; }
+  .conclusion {
+    margin-top: 3vh;
+    text-align: center;
+  }
+
+  /* ========== P2 机制页 ========== */
+  .pref-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2.4vw;
+    margin-bottom: 3vh;
+  }
+  .pref-card {
+    border-radius: 14px;
+    padding: 2.6vh 1.8vw 2.4vh;
+  }
+  .pref-card.explicit { background: var(--blue-bg); }
+  .pref-card.implicit { background: var(--red-bg); }
+  .pref-card .pt {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 1.2vh;
+  }
+  .pref-card .pt .tag {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+  .pref-card.explicit .tag { background: #c2dbff; color: #1a4f9e; }
+  .pref-card.implicit .tag { background: #f9c5d1; color: #a01a35; }
+  .pref-card .def { font-size: 14.5px; color: #555; margin-bottom: 1.4vh; }
+  .pref-row { font-size: 14px; line-height: 1.75; color: #333; }
+  .pref-row b { color: var(--ink); }
+  .pref-row .vec {
+    display: inline-block;
+    background: #fff;
+    padding: 1px 8px;
+    border-radius: 6px;
+    font-weight: 700;
+    color: var(--red);
+    font-size: 13px;
+    margin-left: 4px;
+  }
+
+  /* pipeline 图 */
+  .pipeline {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 2.2vh 1.8vw;
+    position: relative;
+  }
+  .pipe-flow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    flex-wrap: nowrap;
+  }
+  .pipe-node {
+    text-align: center;
+    font-size: 13px;
+    line-height: 1.35;
+    padding: 0 4px;
+    white-space: nowrap;
+  }
+  .pipe-node .nm { font-weight: 700; color: var(--ink); }
+  .pipe-node .ds { color: var(--sub); font-size: 11.5px; display: block; margin-top: 2px; }
+  .pipe-arrow {
+    flex: 0 0 auto;
+    color: #c4c4c4;
+    font-size: 16px;
+    padding: 0 6px;
+  }
+  .pipe-merge {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: stretch;
+  }
+  .pipe-src {
+    font-size: 12.5px;
+    padding: 5px 12px;
+    border-radius: 8px;
+    font-weight: 600;
+    text-align: center;
+  }
+  .pipe-src.blue { background: var(--blue-bg); color: #1a4f9e; }
+  .pipe-src.pink { background: var(--red-bg); color: #a01a35; }
+  .pipe-bundle {
+    position: relative;
+    width: 30px;
+    align-self: stretch;
+  }
+  .pipe-bundle svg { width: 100%; height: 100%; display: block; }
+  .pipe-box {
+    background: var(--ink);
+    color: #fff;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .pipe-box.alt { background: var(--red); }
+  .pipe-feedback {
+    margin-top: 1.4vh;
+    text-align: center;
+    font-size: 12px;
+    color: var(--sub);
+  }
+  .pipe-feedback .fb-arrow { color: var(--red); font-weight: 700; }
+
+  /* ========== P3 手机线框页 ========== */
+  .phones {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 2vw;
+    flex: 1;
+    align-content: center;
+  }
+  .phone-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .phone {
+    width: 100%;
+    max-width: 168px;
+    aspect-ratio: 9 / 18;
+    background: #fff;
+    border: 2.5px solid var(--ink);
+    border-radius: 22px;
+    padding: 14px 8px 10px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 6px 18px rgba(0,0,0,.06);
+  }
+  .phone::before { /* 听筒/刘海 */
+    content: "";
+    position: absolute;
+    top: 6px; left: 50%;
+    transform: translateX(-50%);
+    width: 38px; height: 5px;
+    background: var(--ink);
+    border-radius: 4px;
+  }
+  .phone .screen {
+    flex: 1;
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    font-size: 10px;
+    line-height: 1.4;
+  }
+  .phone .step-no {
+    position: absolute;
+    top: -12px; left: -10px;
+    width: 26px; height: 26px;
+    background: var(--red);
+    color: #fff;
+    border-radius: 50%;
+    font-size: 13px;
+    font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 5;
+  }
+  .phone .stitle {
+    font-weight: 700;
+    font-size: 10.5px;
+    margin-bottom: 6px;
+    color: var(--ink);
+  }
+  .input-box {
+    border: 1px dashed #bbb;
+    border-radius: 6px;
+    padding: 5px 6px;
+    font-size: 9px;
+    color: #333;
+    line-height: 1.5;
+    margin-bottom: 6px;
+    background: #fafafa;
+  }
+  .btn {
+    background: var(--red);
+    color: #fff;
+    text-align: center;
+    padding: 5px 0;
+    border-radius: 5px;
+    font-size: 9.5px;
+    font-weight: 700;
+  }
+  .dim-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9px;
+    padding: 3px 0;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .dim-row .v { color: var(--red); font-weight: 700; }
+  .card-mini {
+    border: 1px solid #e5e5e5;
+    border-radius: 6px;
+    padding: 5px;
+    margin-bottom: 5px;
+  }
+  .photo-area {
+    background: linear-gradient(135deg, #ffd6df 0%, #ffc1cf 100%);
+    height: 42px;
+    border-radius: 4px;
+    margin-bottom: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 8px; color: #a01a35;
+  }
+  .why {
+    font-size: 8px;
+    line-height: 1.5;
+    color: #555;
+  }
+  .why .ck { color: var(--red); font-weight: 700; }
+  .actions {
+    display: flex;
+    justify-content: space-around;
+    margin-top: 5px;
+    font-size: 11px;
+  }
+  .actions .heart { color: var(--red); }
+  .actions .cross { color: #999; }
+  .actions .note {
+    font-size: 7.5px;
+    color: #bbb;
+    text-align: center;
+    margin-top: 3px;
+    width: 100%;
+  }
+  .hint-card {
+    background: #fff5f7;
+    border: 1px solid #ffd6df;
+    border-radius: 6px;
+    padding: 6px;
+    font-size: 8.5px;
+    line-height: 1.55;
+    color: #333;
+  }
+  .btns-2 { display: flex; gap: 4px; margin-top: 6px; }
+  .btns-2 .btn { flex: 1; font-size: 8.5px; padding: 4px 0; }
+  .btns-2 .btn.ghost { background: #eee; color: #666; }
+  .phone-cap {
+    margin-top: 1.2vh;
+    font-size: 12.5px;
+    color: #555;
+    text-align: center;
+    line-height: 1.45;
+    max-width: 170px;
+  }
+  .phone-cap b { color: var(--ink); }
+
+  /* ========== P4 决策卡片 ========== */
+  .decisions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2.4vw 2.4vw;
+    flex: 1;
+    align-content: center;
+  }
+  .dec-card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--red);
+    border-radius: 10px;
+    padding: 2.6vh 1.8vw;
+  }
+  .dec-card .dt {
+    font-size: 19px;
+    font-weight: 700;
+    margin-bottom: 1vh;
+  }
+  .dec-card .dt .code { color: var(--red); margin-right: 6px; }
+  .dec-card .dd {
+    font-size: 15.5px;
+    line-height: 1.7;
+    color: #555;
+  }
+
+  /* ========== P5 风险页 ========== */
+  .risks {
+    display: flex;
+    flex-direction: column;
+    gap: 1.8vh;
+    flex: 1;
+    justify-content: center;
+  }
+  .risk-row {
+    display: grid;
+    grid-template-columns: 1fr auto 1.4fr;
+    gap: 1.5vw;
+    align-items: center;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 2vh 1.8vw;
+  }
+  .risk-name { font-size: 17px; font-weight: 700; }
+  .risk-arrow { color: var(--red); font-size: 20px; font-weight: 700; }
+  .risk-resp { font-size: 15.5px; color: #555; line-height: 1.6; }
+
+  /* ========== P6 MVP ========== */
+  .mvp-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 2vw;
+    flex: 1;
+    align-content: start;
+  }
+  .mvp-col h4 {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 1.6vh;
+    padding-bottom: .7vh;
+    border-bottom: 2px solid var(--ink);
+    display: inline-block;
+  }
+  .mvp-col.do h4 { border-color: var(--red); }
+  .mvp-col.dont h4 { border-color: #999; }
+  .mvp-col.metric h4 { border-color: #1a4f9e; }
+  .mvp-list { list-style: none; }
+  .mvp-list li {
+    font-size: 15px;
+    line-height: 1.65;
+    padding: .8vh 0;
+    padding-left: 18px;
+    position: relative;
+    color: #333;
+  }
+  .mvp-list li::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 1.3vh;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--red);
+  }
+  .mvp-col.dont .mvp-list li::before { background: #c4c4c4; }
+  .mvp-col.metric .mvp-list li::before { background: #1a4f9e; }
+  .roadmap {
+    margin-top: 2.5vh;
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: var(--ink);
+    border-radius: 10px;
+    padding: 1.6vh 1.5vw;
+    color: #fff;
+  }
+  .roadmap .seg {
+    flex: 1;
+    text-align: center;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: .03em;
+  }
+  .roadmap .rarrow { color: var(--red); font-size: 18px; padding: 0 6px; }
+  .thanks {
+    margin-top: 1.5vh;
+    text-align: right;
+    font-size: 13px;
+    color: var(--sub);
+  }
+
+  /* ========== 打印 / PDF ========== */
+  @media print {
+    @page { size: 1920px 1080px; margin: 0; }
+    html, body { width: 1920px; height: auto; overflow: visible; background: #fff; }
+    .deck { width: 1920px; height: auto; }
+    .slide {
+      position: relative;
+      page-break-after: always;
+      break-after: page;
+      display: flex !important;
+      opacity: 1 !important;
+      width: 1920px;
+      height: 1080px;
+      padding: 60px 90px 70px;
+    }
+    .meta, .meta .pdf-hint { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="deck">
+
+  <!-- 右上角页码 -->
+  <div class="meta">
+    <span id="cur">1</span><span class="sep">/</span><span id="total">7</span>
+  </div>
+  <div class="meta pdf-hint">浏览器 Cmd+P → 存为 PDF</div>
+
+  <!-- ========== P0 封面 ========== -->
+  <section class="slide active cover" data-page="1">
+    <div class="brand">相<span class="dot">·</span>中</div>
+    <div class="tagline">你说不清的喜欢，AI 帮你找得到。</div>
+    <div class="desc">小红书社交突破 · 隐含意图驱动的相亲匹配</div>
+    <div class="ver">演示版 v0.1</div>
+  </section>
+
+  <!-- ========== P1 问题 ========== -->
+  <section class="slide alt" data-page="2">
+    <div class="kicker">PROBLEM</div>
+    <div class="title">相亲软件，听不懂<span class="accent">"说不清的喜欢"</span></div>
+    <div class="cols-2">
+      <div>
+        <div class="panel-h">现状两条路，都有天花板</div>
+        <div class="item"><span class="num">1</span><span class="lbl">滑照片</span>：被动、低效、纯靠肉眼，无法主动筛选</div>
+        <div class="item"><span class="num">2</span><span class="lbl">填字段匹配</span>：字段是平台预设的，覆盖不到"瓜子脸、不戴眼镜、书卷气"</div>
+      </div>
+      <div>
+        <div class="panel-h">一个真实场景</div>
+        <div class="scene-box">
+          小 A 想找"不戴眼镜、温柔、有点文艺"的女生<br>
+          Tinder 滑了 200 张没找到 <span class="arrow">→</span> 在 Soul 填了 20 个字段也表达不出来 <span class="arrow">→</span> 流失
+        </div>
+      </div>
+    </div>
+    <div class="conclusion">
+      <span class="red-line">不是体验问题，是表达 + 理解能力的缺位。</span>
+    </div>
+  </section>
+
+  <!-- ========== P2 机制 ========== -->
+  <section class="slide" data-page="3">
+    <div class="kicker">MECHANISM</div>
+    <div class="title">偏好有两类，AI 各自击破</div>
+
+    <div class="pref-cols">
+      <div class="pref-card explicit">
+        <div class="pt">A 显性偏好<span class="tag">用户已明确</span></div>
+        <div class="def">用户自己已明确的偏好</div>
+        <div class="pref-row">例：不戴眼镜、瓜子脸、温柔文艺</div>
+        <div class="pref-row">获取：自然语言描述 / 参考图 / 预设字段</div>
+        <div class="pref-row">AI 作用：解析为<span class="vec">意图向量</span></div>
+      </div>
+      <div class="pref-card implicit">
+        <div class="pt">B 隐性偏好<span class="tag">用户自己还没发现</span></div>
+        <div class="def">用户自己还没发现的偏好</div>
+        <div class="pref-row">例：嘴上说喜欢文艺，实际心动更多是高冷运动风</div>
+        <div class="pref-row">获取：停留时长 / like·pass / 反复回看 等行为信号</div>
+        <div class="pref-row">AI 作用：反推为<span class="vec">偏好向量</span></div>
+      </div>
+    </div>
+
+    <div class="pipeline">
+      <div class="pipe-flow">
+        <div class="pipe-merge">
+          <div class="pipe-src blue">显性偏好<br>意图向量</div>
+          <div class="pipe-src pink">隐性偏好<br>偏好向量</div>
+        </div>
+        <div class="pipe-bundle">
+          <svg viewBox="0 0 30 80" preserveAspectRatio="none">
+            <path d="M0,10 C18,10 12,40 30,40" stroke="#1a4f9e" stroke-width="1.6" fill="none"/>
+            <path d="M0,70 C18,70 12,40 30,40" stroke="#a01a35" stroke-width="1.6" fill="none"/>
+            <polygon points="30,40 24,36 24,44" fill="#c4c4c4"/>
+          </svg>
+        </div>
+        <div class="pipe-node"><span class="nm">候选特征向量</span><span class="ds">语义+视觉</span></div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-node"><span class="nm">匹配打分</span><span class="ds">排序</span></div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-box">Top-N 推荐</div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-box alt">反馈微调</div>
+      </div>
+      <div class="pipe-feedback">
+        <span class="fb-arrow">↺</span> 反馈同时回流更新两类偏好（显性 + 隐性）
+      </div>
+    </div>
+
+    <div class="footer-line">
+      <span class="red-line">范式升级：标签检索（schema 匹配）→ 语义 + 视觉向量匹配 + 行为反推</span>
+    </div>
+  </section>
+
+  <!-- ========== P3 旅程 ========== -->
+  <section class="slide alt" data-page="4">
+    <div class="kicker">JOURNEY</div>
+    <div class="title">从"你描述" 到 <span class="accent">"AI 比你更懂你"</span></div>
+
+    <div class="phones">
+      <!-- 手机 1 -->
+      <div class="phone-wrap">
+        <div class="phone">
+          <div class="step-no">1</div>
+          <div class="screen">
+            <div class="stitle">输入（显性偏好）</div>
+            <div class="input-box">温柔、不戴眼镜、文艺、瓜子脸</div>
+            <div class="btn">AI 帮我找</div>
+          </div>
+        </div>
+        <div class="phone-cap">输入框 <b>自然语言描述</b>，触发匹配</div>
+      </div>
+
+      <!-- 手机 2 -->
+      <div class="phone-wrap">
+        <div class="phone">
+          <div class="step-no">2</div>
+          <div class="screen">
+            <div class="stitle">AI 拆解（透明化）</div>
+            <div class="dim-row"><span>气质</span><span class="v">温柔 ✓</span></div>
+            <div class="dim-row"><span>眼镜</span><span class="v">无 ✓</span></div>
+            <div class="dim-row"><span>风格</span><span class="v">文艺 ✓</span></div>
+            <div class="dim-row"><span>脸型</span><span class="v">瓜子脸 ✓</span></div>
+          </div>
+        </div>
+        <div class="phone-cap">展示 AI 把描述<b>拆成的维度</b></div>
+      </div>
+
+      <!-- 手机 3 -->
+      <div class="phone-wrap">
+        <div class="phone">
+          <div class="step-no">3</div>
+          <div class="screen">
+            <div class="stitle">推荐 + 采集行为</div>
+            <div class="card-mini">
+              <div class="photo-area">候选照片</div>
+              <div class="why">
+                <span class="ck">不戴眼镜 ✓</span> ｜ <span class="ck">瓜子脸 ✓</span><br>
+                <span class="ck">文艺风 ✓</span> ｜ 唯一差异：她偏活泼
+              </div>
+            </div>
+            <div class="actions">
+              <span class="heart">♡ 心动</span>
+              <span class="cross">✕ 跳过</span>
+            </div>
+            <div class="note">行为信号被记录</div>
+          </div>
+        </div>
+        <div class="phone-cap">候选卡 + <b>"为什么推荐给你"</b></div>
+      </div>
+
+      <!-- 手机 4 -->
+      <div class="phone-wrap">
+        <div class="phone">
+          <div class="step-no">4</div>
+          <div class="screen">
+            <div class="stitle">几天后：AI 发现隐性偏好</div>
+            <div class="hint-card">
+              你嘴上说喜欢温柔文艺，但最近心动更多是高冷运动风——要不要看看？
+            </div>
+            <div class="btns-2">
+              <div class="btn">看看</div>
+              <div class="btn ghost">不是，继续按原来的</div>
+            </div>
+          </div>
+        </div>
+        <div class="phone-cap">提示卡：<b>隐性偏好</b>浮现</div>
+      </div>
+    </div>
+
+    <div class="footer-line" style="text-align:center;">
+      <span class="red-line">显性偏好让用户上手，隐性偏好让产品越用越懂</span>
+    </div>
+  </section>
+
+  <!-- ========== P4 决策 ========== -->
+  <section class="slide" data-page="5">
+    <div class="kicker">DECISIONS</div>
+    <div class="title">四个关键取舍</div>
+
+    <div class="decisions">
+      <div class="dec-card">
+        <div class="dt"><span class="code">D1</span>为什么独立 app</div>
+        <div class="dd">场景聚焦、合规隔离、不污染小红书内容生态</div>
+      </div>
+      <div class="dec-card">
+        <div class="dt"><span class="code">D2</span>冷启动</div>
+        <div class="dd">借小红书公开笔记（授权）做初始 profile 池；先做单边工具（"帮你找到理想型的长相参考"）切入，再过渡双边匹配</div>
+      </div>
+      <div class="dec-card">
+        <div class="dt"><span class="code">D3</span>匹配透明化 + 行为闭环</div>
+        <div class="dd">主动展示匹配理由（建信任）；同时采集 like/pass/停留 反推隐性偏好，让推荐越用越准</div>
+      </div>
+      <div class="dec-card">
+        <div class="dt"><span class="code">D4</span>价值观护栏</div>
+        <div class="dd">做"品味匹配"而非"外貌淘汰"，不展示被淘汰者，不做单一颜值打分排名</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== P5 风险 ========== -->
+  <section class="slide alt" data-page="6">
+    <div class="kicker">RISKS</div>
+    <div class="title">知道边界在哪，才做得下去</div>
+
+    <div class="risks">
+      <div class="risk-row">
+        <div class="risk-name">AI 误判 / 幻觉</div>
+        <div class="risk-arrow">→</div>
+        <div class="risk-resp">匹配理由透明 + 用户反馈闭环 + 人工抽审</div>
+      </div>
+      <div class="risk-row">
+        <div class="risk-name">外貌歧视 / 物化</div>
+        <div class="risk-arrow">→</div>
+        <div class="risk-resp">包装为"品味匹配"；种族、残疾等不可作为筛选条件</div>
+      </div>
+      <div class="risk-row">
+        <div class="risk-name">隐私合规</div>
+        <div class="risk-arrow">→</div>
+        <div class="risk-resp">照片授权、不存原始生物特征数据、可一键删除；行为反推只用聚合信号，不画像到具体个人</div>
+      </div>
+      <div class="risk-row">
+        <div class="risk-name">用户信任</div>
+        <div class="risk-arrow">→</div>
+        <div class="risk-resp">灰度上线，先做低 stakes 推荐；隐性偏好提示要可解释、可关闭</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== P6 MVP ========== -->
+  <section class="slide" data-page="7">
+    <div class="kicker">MVP &amp; NEXT</div>
+    <div class="title">先做小，再做大</div>
+
+    <div class="mvp-grid">
+      <div class="mvp-col do">
+        <h4>MVP 只做</h4>
+        <ul class="mvp-list">
+          <li>显性偏好：文字描述 + 参考图 双通道匹配</li>
+          <li>隐性偏好：行为信号采集 + 基础反推（先做 like/pass 统计）</li>
+          <li>单城市 / 单人群灰度</li>
+        </ul>
+      </div>
+      <div class="mvp-col dont">
+        <h4>MVP 不做（克制）</h4>
+        <ul class="mvp-list">
+          <li>视频、语音、复杂社交关系</li>
+        </ul>
+      </div>
+      <div class="mvp-col metric">
+        <h4>成功指标</h4>
+        <ul class="mvp-list">
+          <li>匹配准确率（用户 like 率）</li>
+          <li>描述 → 首次心动 时长</li>
+          <li>次日 / 7 日留存</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="roadmap">
+      <div class="seg">单点工具</div>
+      <span class="rarrow">→</span>
+      <div class="seg">双边匹配</div>
+      <span class="rarrow">→</span>
+      <div class="seg">关系沉淀</div>
+    </div>
+    <div class="thanks">谢谢，欢迎提问</div>
+  </section>
+
+</div>
+
+<script>
+(function () {
+  var slides = document.querySelectorAll('.slide');
+  var total = slides.length;
+  var curEl = document.getElementById('cur');
+  var totalEl = document.getElementById('total');
+  totalEl.textContent = total;
+  var idx = 0;
+
+  function show(i) {
+    if (i < 0) i = 0;
+    if (i >= total) i = total - 1;
+    slides.forEach(function (s, k) {
+      s.classList.toggle('active', k === i);
+    });
+    idx = i;
+    curEl.textContent = i + 1;
+  }
+
+  function next() { if (idx < total - 1) show(idx + 1); }
+  function prev() { if (idx > 0) show(idx - 1); }
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+      e.preventDefault(); next();
+    } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+      e.preventDefault(); prev();
+    } else if (e.key === 'Home') {
+      e.preventDefault(); show(0);
+    } else if (e.key === 'End') {
+      e.preventDefault(); show(total - 1);
+    }
+  });
+
+  // 点击右侧下一页，左侧上一页（非文本选中时）
+  document.addEventListener('click', function (e) {
+    if (window.getSelection && window.getSelection().toString()) return;
+    var w = window.innerWidth;
+    if (e.clientX > w * 0.6) next();
+    else if (e.clientX < w * 0.4) prev();
+  });
+
+  show(0);
+})();
+</script>
+</body>
+</html>

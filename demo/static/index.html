@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>相中 — 你说不清的喜欢，AI 帮你找得到。</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="phone">
+    <!-- 模式角标（AI 模式 / 本地兜底模式） -->
+    <div id="modeBadge" class="mode-badge" title="当前 LLM 调用模式">…</div>
+    <!-- 顶部状态栏 -->
+    <div class="statusbar">
+      <span class="time">9:41</span>
+      <span class="dots">●●● ▮</span>
+    </div>
+
+    <div class="screen">
+      <!-- 品牌区 -->
+      <header class="brand">
+        <h1>相中</h1>
+        <p class="tagline">你说不清的喜欢，AI 帮你找得到。</p>
+      </header>
+
+      <!-- 输入区 -->
+      <section class="input-area">
+        <textarea id="desc" rows="3" placeholder="试试描述一下：温柔、不戴眼镜、瓜子脸、文艺风"></textarea>
+        <div class="examples" id="examples">
+          <span class="chip" data-text="温柔、不戴眼镜、瓜子脸、文艺风">温柔、不戴眼镜、瓜子脸</span>
+          <span class="chip" data-text="阳光、运动风、戴眼镜、圆脸">阳光、运动风、戴眼镜</span>
+        </div>
+        <div class="ref-row">
+          <button class="ref-btn" disabled>📷 上传理想型照片</button>
+          <span class="ref-hint">（v1 未接入图片识别）</span>
+        </div>
+        <button id="matchBtn" class="primary-btn">AI 帮我找</button>
+      </section>
+
+      <!-- 结果区 -->
+      <section class="result-area">
+        <!-- 空状态 -->
+        <div class="empty-state" id="emptyState">
+          <p class="empty-title">先描述一下你心里的那个人</p>
+          <p class="empty-sub">或点上面的示例一键填入 ↑</p>
+        </div>
+        <!-- 加载态 -->
+        <div class="loading hidden" id="loading">
+          <div class="spinner"></div>
+          <p>AI 正在理解你的描述…</p>
+        </div>
+        <!-- 结果 -->
+        <div class="result hidden" id="result">
+          <div class="intent-row">
+            <span class="intent-label">AI 把你的描述理解为：</span>
+            <span class="intent-pills" id="intentPills"></span>
+            <span class="source-tag" id="intentSourceTag">解析</span>
+          </div>
+          <div class="cards" id="cards"></div>
+        </div>
+      </section>
+
+      <!-- 底部：隐性偏好入口 -->
+      <section class="bottom-area">
+        <button id="suggestBtn" class="ghost-btn">看看 AI 发现了什么</button>
+        <div class="suggestion hidden" id="suggestion"></div>
+      </section>
+    </div>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

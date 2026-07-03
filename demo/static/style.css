@@ -1,0 +1,262 @@
+/* 相中 demo 前端样式 —— 手机框 + 配色对齐 PPT（§4） */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --red: #FF2442;      /* 小红书红点缀 */
+  --ink: #1a1a1a;      /* 主文字 */
+  --muted: #999;       /* 次要文字 */
+  --line: #eee;
+  --bg: #f0f0f2;
+}
+
+body {
+  font-family: -apple-system, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
+  padding: 24px 0;
+}
+
+/* 手机外框 */
+.phone {
+  width: 390px;
+  background: #fff;
+  border-radius: 38px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  border: 10px solid #1a1a1a;
+  position: relative;
+}
+/* 模式角标（角落，让面试官一眼看到双路） */
+.mode-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 30;
+  font-size: 10px;
+  color: #999;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #eee;
+  border-radius: 999px;
+  padding: 2px 8px;
+  backdrop-filter: blur(4px);
+}
+.mode-badge.ai {
+  color: var(--red);
+  border-color: #ffd9df;
+  background: #fff0f2;
+}
+.statusbar {
+  height: 34px;
+  background: #1a1a1a;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 18px;
+  font-size: 12px;
+}
+.statusbar .dots { letter-spacing: 1px; opacity: 0.9; }
+
+.screen {
+  height: 760px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 品牌 */
+.brand { text-align: center; padding: 18px 16px 8px; }
+.brand h1 { font-size: 28px; color: var(--red); letter-spacing: 2px; }
+.brand .tagline { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+/* 输入区 */
+.input-area { padding: 8px 16px 12px; border-bottom: 1px solid var(--line); }
+.input-area textarea {
+  width: 100%;
+  resize: none;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink);
+  outline: none;
+  font-family: inherit;
+}
+.input-area textarea:focus { border-color: var(--red); }
+
+.examples { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.chip {
+  font-size: 12px;
+  color: var(--red);
+  background: #fff0f2;
+  border: 1px solid #ffd9df;
+  border-radius: 999px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.ref-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.ref-btn {
+  font-size: 12px;
+  color: #bbb;
+  background: #f2f2f2;
+  border: 1px dashed #ccc;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: not-allowed;
+}
+.ref-hint { font-size: 11px; color: var(--muted); }
+
+.primary-btn {
+  margin-top: 12px;
+  width: 100%;
+  padding: 13px;
+  background: var(--red);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.primary-btn:active { transform: scale(0.99); }
+
+/* 结果区 */
+.result-area { flex: 1; padding: 14px 16px; }
+.empty-state { text-align: center; color: var(--muted); padding-top: 48px; }
+.empty-title { font-size: 15px; color: var(--ink); }
+.empty-sub { font-size: 12px; margin-top: 6px; }
+
+.loading { text-align: center; padding-top: 48px; color: var(--muted); font-size: 13px; }
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #eee;
+  border-top-color: var(--red);
+  border-radius: 50%;
+  margin: 0 auto 10px;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* 意图透明化行（核心卖点呈现） */
+.intent-row {
+  background: #fff8f9;
+  border: 1px solid #ffe1e6;
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.intent-label { font-size: 13px; color: var(--ink); font-weight: 600; }
+.intent-pills { display: flex; flex-wrap: wrap; gap: 4px; }
+.pill {
+  font-size: 11px;
+  background: #fff;
+  border: 1px solid #ffd9df;
+  color: var(--red);
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+.source-tag {
+  font-size: 10px;
+  color: var(--muted);
+  background: #f0f0f0;
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-left: auto;
+}
+.source-tag.ai {
+  color: var(--red);
+  background: #fff0f2;
+}
+
+/* 候选卡片 */
+.cards { margin-top: 12px; display: flex; flex-direction: column; gap: 12px; }
+.card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px;
+  position: relative;
+  background: #fff;
+}
+.card-top { display: flex; gap: 10px; }
+.card img {
+  width: 60px;
+  height: 60px;
+  border-radius: 12px;
+  background: #f5f5f5;
+  object-fit: cover;
+}
+.card .who { display: flex; flex-direction: column; }
+.card .name { font-size: 15px; font-weight: 600; }
+.card .meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.card .score { font-size: 11px; color: var(--red); margin-top: 3px; font-weight: 600; }
+
+.why {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #666;
+  background: #fafafa;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.why b { color: var(--ink); }
+.why ul { list-style: none; margin-top: 3px; }
+.why li { margin-top: 3px; }
+
+.card-actions { display: flex; gap: 10px; margin-top: 10px; }
+.card-actions button {
+  flex: 1;
+  padding: 8px;
+  border-radius: 10px;
+  font-size: 14px;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+.btn-like { color: var(--red); }
+.btn-like.active { background: #fff0f2; border-color: var(--red); }
+.btn-pass { color: var(--muted); }
+.btn-pass.active { background: #f5f5f5; }
+
+/* 底部隐性提示 */
+.bottom-area { padding: 12px 16px 20px; border-top: 1px solid var(--line); }
+.ghost-btn {
+  width: 100%;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid var(--red);
+  color: var(--red);
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.suggestion {
+  margin-top: 12px;
+  border: 1px dashed #ffb3bf;
+  background: #fff8f9;
+  border-radius: 12px;
+  padding: 12px;
+}
+.suggestion .s-title { font-size: 14px; font-weight: 600; color: var(--red); }
+.suggestion .s-body { font-size: 13px; color: var(--ink); margin-top: 6px; line-height: 1.5; }
+.suggestion .s-tag {
+  font-size: 10px;
+  color: var(--muted);
+  background: #f0f0f0;
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin-top: 8px;
+  display: inline-block;
+}
+
+.hidden { display: none !important; }

@@ -217,6 +217,22 @@ body {
 }
 .why b { color: var(--ink); }
 .why ul { list-style: none; margin-top: 3px; }
+
+/* 创建候选人区（演示异步预计算） */
+.create-area { margin: 8px 0; }
+.create-area details { background: var(--bg, #f7f7f7); border-radius: 8px; padding: 8px 12px; }
+.create-area summary { cursor: pointer; font-size: 13px; color: #666; }
+.create-form { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.create-form input[type=text] { padding: 6px 8px; border: 1px solid var(--line, #eee); border-radius: 6px; font-size: 13px; }
+.create-photo-name { font-size: 11px; color: var(--muted, #999); }
+.create-msg { font-size: 12px; color: var(--red, #FF2442); background: #FDECEE; padding: 6px 8px; border-radius: 6px; }
+
+/* 状态 / 兜底标签 */
+.status-tag { display: inline-block; font-size: 10px; color: #888; background: #f0f0f0; padding: 1px 6px; border-radius: 8px; margin-left: 4px; vertical-align: middle; }
+.fallback-tag { display: inline-block; font-size: 10px; color: var(--red, #FF2442); background: #FDECEE; padding: 1px 6px; border-radius: 8px; }
+.fallback-block { margin-top: 12px; }
+.fallback-title { font-size: 12px; color: var(--muted, #999); margin-bottom: 6px; }
+.fallback-card .card-top { opacity: 0.7; }
 .why li { margin-top: 3px; }
 
 .card-actions { display: flex; gap: 10px; margin-top: 10px; }

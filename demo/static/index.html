@@ -38,6 +38,23 @@
         <button id="matchBtn" class="primary-btn">AI 帮我找</button>
       </section>
 
+      <!-- 创建候选人区（演示异步预计算：创建即时返回，后台分析） -->
+      <section class="create-area">
+        <details>
+          <summary>＋ 创建候选人（演示异步预计算）</summary>
+          <div class="create-form">
+            <input type="file" id="createImage" accept="image/*" hidden />
+            <button class="ref-btn" id="createImageBtn" type="button">📷 上传候选人照片</button>
+            <span class="create-photo-name" id="createPhotoName"></span>
+            <input type="text" id="createName" placeholder="姓名" />
+            <input type="text" id="createAge" placeholder="年龄" />
+            <input type="text" id="createCity" placeholder="城市" />
+            <button id="createBtn" class="primary-btn" type="button">创建</button>
+            <div class="create-msg hidden" id="createMsg"></div>
+          </div>
+        </details>
+      </section>
+
       <!-- 结果区 -->
       <section class="result-area">
         <!-- 空状态 -->

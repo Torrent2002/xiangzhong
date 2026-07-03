@@ -112,3 +112,51 @@ vision 真识别出圆脸 / 不戴眼镜 / 温柔，匹配透明化命中。`sty
 > - **match 去掉逐候选 LLM 语义打分**：原对 12 个候选各调一次 LLM 语义分（~70s，且 sem_score 常返固定值不可靠），改纯结构化打分（速度优先，意图解析仍走 AI）。
 > - **vision 不经 openai SDK 同步 client**：其在 uvicorn 线程池里对图片调用会卡死（async def + 同步阻塞 + timeout 不生效），改用 httpx 直接请求豆包端点，超时严格生效。
 > - **选型**：deepseek-chat 不支持图片；doubao-seed-2.0-pro 多模态，文本 + vision 都可用，已实测（deepseek-v4-flash 间歇性返空 content 已弃用）。
+
+---
+
+## 4. 架构升级：候选人照片分析改线下异步预计算
+
+### 写入路径（异步预计算）
+创建候选人 → 立即返回「创建成功，AI 分析中」（pending）→ 后台 `asyncio.create_task` + `asyncio.to_thread` 跑 vision 分析 → 回填 attributes → analyzed。
+```
+POST /api/candidate/create {name,age,city,photo}
+→ 0.0s 立即返回 {ok, id, status:"created", analysis_status:"pending", msg:"创建成功，AI 正在分析照片"}
+
+GET /api/candidate/{id} 轮询
+  等 5s: pending   等 15s: analyzed   ← 后台异步分析完成
+```
+
+### 查询路径（低延时匹配）
+查询者上传理想型图 → vision 分析查询图 → 和库里已预计算的候选 attributes 做结构化匹配（fallback.match_score，无逐候选 LLM）。
+```
+POST /api/explicit/match_image {image}
+→ 38.3s（vision 查询图）| source:ai | matches:3（用预计算 attributes）| fallback_feed:0
+  top: 苏同学 score=1.0 analysis_status=precomputed
+```
+注：38s 是查询者 vision 分析查询图的时间；候选 attributes 已预计算，匹配阶段低延时（结构化打分）。
+
+### 多级兜底
+- 候选 attributes=None（pending/failed）→ 进 fallback_feed（不参与属性匹配）
+- vision 失效（source=none）→ 全候选作 fallback_feed（按预填信息 age/city）
+- match_image 返回 {matches, fallback_feed}，前端兜底卡片标注「兜底推荐」
+
+### 冷加载
+启动 `candidate_store.load()` 读 candidates.json，attributes 已有 → analysis_status=precomputed（模拟索引已建好）。
+
+> 工程取舍：
+> - 后台 task 必须保持引用（全局 `_tasks` set），否则被 GC 回收不执行（asyncio 已知坑，已踩已修）。
+> - 后台分析用 `asyncio.to_thread` 隔离同步 vision，不阻塞 event loop。
+> - 查询匹配不用 LLM（候选已预计算，结构化打分即可），保证低延时。
+
+---
+
+## 5. 详情页去 AI 标定（产品克制）
+
+`/api/candidate/{id}` 刻意不返回 AI 标定的 attributes（glasses/faceShape/style/vibe）和详细匹配理由，只返回基本信息 + 匹配度 + 分析状态：
+```
+GET /api/candidate/c01
+→ {ok, candidate:{id,name,age,city,bio,photo}, match_score:0.333, analysis_status:precomputed, has_intent}
+  返回字段: [id, name, age, city, bio, photo]   ← 无 attributes
+```
+看一个人详情时不暴露 AI 给 ta 打的标签（避免物化），只看 ta 是谁 + 和你多匹配。卡片列表保留"为什么推荐"（透明化在列表层，不进详情）。

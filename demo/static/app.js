@@ -26,6 +26,14 @@ const els = {
   detailPanel: $("detailPanel"),
   detailBody: $("detailBody"),
   detailClose: $("detailClose"),
+  createImage: $("createImage"),
+  createImageBtn: $("createImageBtn"),
+  createPhotoName: $("createPhotoName"),
+  createName: $("createName"),
+  createAge: $("createAge"),
+  createCity: $("createCity"),
+  createBtn: $("createBtn"),
+  createMsg: $("createMsg"),
 };
 
 function show(el) { el.classList.remove("hidden"); }
@@ -135,7 +143,7 @@ async function runMatchImage(b64) {
       refreshMode();
       return;
     }
-    renderResult(data.intent, data.matches);
+    renderResult(data.intent, data.matches, data.fallback_feed);
     refreshMode();
   } catch (err) {
     els.result.innerHTML = '<p class="empty-sub">出错了：' + esc(err) + "（请确认后端已启动）</p>";
@@ -174,7 +182,7 @@ els.matchBtn.addEventListener("click", async () => {
     });
     const data = await res.json();
     await minDelay;
-    renderResult(data.intent, data.matches);
+    renderResult(data.intent, data.matches, data.fallback_feed);
     refreshMode();
   } catch (err) {
     els.result.innerHTML = '<p class="empty-sub">出错了：' + esc(err) + "（请确认后端已启动）</p>";
@@ -184,10 +192,35 @@ els.matchBtn.addEventListener("click", async () => {
   }
 });
 
-function renderResult(intent, matches) {
+function statusLabel(s) {
+  return s === "analyzed" ? "已分析" : s === "pending" ? "分析中" : s === "failed" ? "分析失败" : s === "precomputed" ? "已预计算" : "";
+}
+
+function renderResult(intent, matches, fallbackFeed) {
   renderIntent(intent);
-  renderCards(matches);
+  renderCards(matches, false);
+  if (fallbackFeed && fallbackFeed.length) renderFallbackFeed(fallbackFeed);
   show(els.result);
+}
+
+function renderFallbackFeed(feed) {
+  const block = document.createElement("div");
+  block.className = "fallback-block";
+  block.innerHTML = '<div class="fallback-title">兜底推荐（属性未就绪 / vision 失效，按预填信息）</div>' +
+    feed.map((m) => {
+      const c = m.candidate;
+      return '<div class="card fallback-card" data-cid="' + esc(c.id) + '">' +
+        '<div class="card-top">' +
+          '<img src="/' + esc(c.photo) + '" alt="' + esc(c.name) + '" />' +
+          '<div class="who">' +
+            '<span class="name">' + esc(c.name) + "</span>" +
+            '<span class="meta">' + esc(c.age) + " · " + esc(c.city) + "</span>" +
+            '<span class="fallback-tag">兜底 · ' + esc(statusLabel(m.analysis_status)) + "</span>" +
+          "</div>" +
+          '<span class="card-more" title="查看详情">›</span>' +
+        "</div></div>";
+    }).join("");
+  els.cards.appendChild(block);
 }
 
 function renderIntent(intent) {
@@ -218,17 +251,18 @@ function attrLine(a) {
   return [a.style, a.vibe, a.glasses ? "戴眼镜" : "不戴眼镜", a.faceShape].join(" · ");
 }
 
-function renderCards(matches) {
+function renderCards(matches, isFallback) {
   els.cards.innerHTML = matches
     .map((m) => {
       const c = m.candidate;
       const a = c.attributes || {};
+      const stTag = m.analysis_status ? '<span class="status-tag">' + esc(statusLabel(m.analysis_status)) + "</span>" : "";
       return (
         '<div class="card" data-cid="' + esc(c.id) + '">' +
         '<div class="card-top">' +
           '<img src="/' + esc(c.photo) + '" alt="' + esc(c.name) + '" />' +
           '<div class="who">' +
-            '<span class="name">' + esc(c.name) + "</span>" +
+            '<span class="name">' + esc(c.name) + " " + stTag + "</span>" +
             '<span class="meta">' + esc(c.age) + " · " + esc(c.city) + "</span>" +
             '<span class="meta">' + esc(attrLine(a)) + "</span>" +
             '<span class="score">匹配度 ' + Math.round((m.score || 0) * 100) + "%</span>" +
@@ -236,7 +270,7 @@ function renderCards(matches) {
           '<span class="card-more" title="查看详情">›</span>' +
         "</div>" +
         '<div class="why"><b>为什么推荐</b><ul>' +
-          m.reasons.map((r) => "<li>" + esc(r) + "</li>").join("") +
+          (m.reasons || []).map((r) => "<li>" + esc(r) + "</li>").join("") +
         "</ul></div>" +
         '<div class="card-actions">' +
           '<button class="btn-like" data-cid="' + esc(c.id) + '" data-action="like">♡ 心动</button>' +
@@ -246,7 +280,6 @@ function renderCards(matches) {
       );
     })
     .join("");
-  // 卡片渲染后，挂停留计时
   attachDwellTracking();
 }
 
@@ -320,40 +353,27 @@ async function openDetail(cid) {
       els.detailBody.innerHTML = '<p class="empty-sub">找不到该候选人</p>';
       return;
     }
-    renderDetail(data.candidate, data.reasons || [], data.has_intent);
+    renderDetail(data.candidate, data);
   } catch (err) {
     els.detailBody.innerHTML = '<p class="empty-sub">出错了：' + esc(err) + "</p>";
   }
 }
 
-function renderDetail(c, reasons, hasIntent) {
-  const a = c.attributes || {};
-  const attrRows = [
-    ["戴眼镜", a.glasses === true ? "是" : a.glasses === false ? "否" : "—"],
-    ["脸型", a.faceShape || "—"],
-    ["风格", a.style || "—"],
-    ["气质", a.vibe || "—"],
-  ];
+function renderDetail(c, data) {
+  const ms = data.match_score;
+  const scoreTxt = (ms == null) ? "暂无匹配度（先匹配一下）" : "匹配度 " + Math.round(ms * 100) + "%";
+  const stTag = data.analysis_status ? '<span class="status-tag">' + esc(statusLabel(data.analysis_status)) + "</span>" : "";
   els.detailBody.innerHTML =
     '<div class="detail-hero">' +
       '<img src="/' + esc(c.photo) + '" alt="' + esc(c.name) + '" />' +
-      '<div class="detail-name">' + esc(c.name) + " · " + esc(c.age) + " · " + esc(c.city) + "</div>" +
+      '<div class="detail-name">' + esc(c.name) + " · " + esc(c.age) + " · " + esc(c.city) + " " + stTag + "</div>" +
+    "</div>" +
+    '<div class="detail-section"><div class="detail-sec-title">匹配度</div>' +
+      '<p class="detail-bio">' + esc(scoreTxt) + "</p>" +
     "</div>" +
     '<div class="detail-section"><div class="detail-sec-title">关于 TA</div>' +
-      '<p class="detail-bio">' + esc(c.bio || "") + "</p>" +
+      '<p class="detail-bio">' + esc(c.bio || "（暂无简介）") + "</p>" +
     "</div>" +
-    '<div class="detail-section"><div class="detail-sec-title">特征</div>' +
-      '<div class="detail-attrs">' +
-        attrRows.map((r) =>
-          '<div class="attr-row"><span class="attr-k">' + esc(r[0]) + "</span>" +
-          '<span class="attr-v">' + esc(r[1]) + "</span></div>"
-        ).join("") +
-      "</div>" +
-    "</div>" +
-    (hasIntent && reasons.length
-      ? '<div class="detail-section detail-why"><div class="detail-sec-title">为什么推荐</div><ul>' +
-        reasons.map((r) => "<li>" + esc(r) + "</li>").join("") + "</ul></div>"
-      : "") +
     '<div class="detail-actions">' +
       '<button class="btn-like" data-cid="' + esc(c.id) + '" data-action="like">♡ 心动</button>' +
       '<button class="btn-pass" data-cid="' + esc(c.id) + '" data-action="pass">✕ 跳过</button>' +
@@ -412,5 +432,55 @@ els.suggestBtn.addEventListener("click", async () => {
   } finally {
     els.suggestBtn.disabled = false;
     els.suggestBtn.textContent = "看看 AI 发现了什么";
+  }
+});
+
+/* ===== 创建候选人（演示异步预计算：写入即时返回，后台分析） ===== */
+let _createPhotoB64 = "";
+els.createImageBtn.addEventListener("click", () => els.createImage.click());
+els.createImage.addEventListener("change", () => {
+  const f = els.createImage.files && els.createImage.files[0];
+  if (!f) return;
+  els.createPhotoName.textContent = f.name;
+  const r = new FileReader();
+  r.onload = (ev) => {
+    const url = String(ev.target.result || "");
+    const i = url.indexOf(",");
+    _createPhotoB64 = i >= 0 ? url.slice(i + 1) : url;
+  };
+  r.readAsDataURL(f);
+});
+els.createBtn.addEventListener("click", async () => {
+  if (!_createPhotoB64) {
+    els.createMsg.textContent = "请先上传候选人照片";
+    els.createMsg.classList.remove("hidden");
+    return;
+  }
+  els.createBtn.disabled = true;
+  els.createBtn.textContent = "创建中…";
+  try {
+    const res = await fetch("/api/candidate/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: els.createName.value.trim(),
+        age: els.createAge.value.trim(),
+        city: els.createCity.value.trim(),
+        photo: _createPhotoB64,
+      }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      els.createMsg.textContent = "✓ " + data.msg + "（ID: " + data.id + "，状态: " + statusLabel(data.analysis_status) + "）。后台异步分析中，下次匹配会用 ta 的预计算特征。";
+    } else {
+      els.createMsg.textContent = "创建失败";
+    }
+    els.createMsg.classList.remove("hidden");
+  } catch (e) {
+    els.createMsg.textContent = "出错：" + e;
+    els.createMsg.classList.remove("hidden");
+  } finally {
+    els.createBtn.disabled = false;
+    els.createBtn.textContent = "创建";
   }
 });

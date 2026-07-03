@@ -27,13 +27,15 @@ from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 from fastapi.staticfiles import StaticFiles
 
-from modules import ai_client, explicit_preference, implicit_preference
+from typing import Any
+from modules import ai_client, explicit_preference, implicit_preference, candidate_store
 
 # 铁律#1 不崩：静态 / 头像目录缺失时先建空目录，避免 StaticFiles 挂载抛错。
 STATIC_DIR.mkdir(exist_ok=True)
 AVATAR_DIR.mkdir(exist_ok=True)
 
 app = FastAPI(title="相中 demo")
+candidate_store.load()  # 冷加载：启动读 candidates.json 为已预计算索引
 
 # 静态资源挂载（前端不持有 key，资源全本地，无 CDN）。
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
@@ -78,20 +80,27 @@ class ImageBody(BaseModel):
 
 @app.post("/api/explicit/match_image")
 def explicit_match_image(body: ImageBody):
-    """参考照片 → 意图（vision）→ 排序候选 + "为什么推荐"。
+    """参考照片 → 意图（vision）→ 和库里已预计算的候选 attributes 结构化匹配 + 兜底 feed。
 
-    sync def：FastAPI 自动在线程池跑，同步 LLM 调用不阻塞 event loop、timeout 生效。
-    body: {"image": "<base64 不带 data: 前缀>"}。
-    vision 未配置/失败时 intent.source="none"，matches 仍按空 intent 兜底（结构化打分=0，但列表非空）。
+    架构：候选 attributes 是创建时异步预计算的（candidate_store），查询只做轻量结构化匹配（低延时）。
+    多级兜底：pending/failed 候选 → fallback_feed；vision 失效（source=none）→ 全候选作兜底 feed。
     """
     intent = explicit_preference.parse_intent_from_image(body.image)
-    # 仅当 vision 成功解析时回写 last_intent（避免图片失败污染隐性对照）。
     if intent.get("source") == "ai":
         implicit_preference.set_last_intent(intent)
-    matches = explicit_preference.match(intent)
+    if intent.get("source") == "none":
+        results, fallback_pool = [], candidate_store.all_candidates()
+    else:
+        results, fallback_pool = candidate_store.match(intent)
+    matches = results[:3]
+    fallback_feed = [
+        {"candidate": c, "score": 0.0, "analysis_status": c.get("analysis_status"), "fallback": True}
+        for c in fallback_pool
+    ]
     return {
         "intent": intent,
         "matches": matches,
+        "fallback_feed": fallback_feed,
         "mode": ai_client.status()["mode"],
         "vision_available": ai_client.is_vision_available(),
     }
@@ -99,25 +108,53 @@ def explicit_match_image(body: ImageBody):
 
 @app.get("/api/candidate/{cid}")
 def candidate_detail(cid: str):
-    """单个候选详情：完整 bio + 全部 attributes；若当前有 last_intent，附匹配理由。
+    """单个候选详情：只返回基本信息 + 匹配度 + 分析状态。
 
-    供详情面板使用：姓名/年龄/城市/bio/attributes + "为什么推荐"。
-    无 last_intent 时 reasons=[]，前端不显示理由区。
+    刻意不返回 AI 标定的 attributes（glasses/faceShape/style/vibe）和详细匹配理由：
+    看一个人详情时不暴露 AI 给 ta 打的标签（避免物化），只看 ta 是谁 + 和你多匹配。
     """
-    cid = (cid or "").strip()
-    candidates = explicit_preference.load_candidates()
-    cand = next((c for c in candidates if c.get("id") == cid), None)
+    cand = candidate_store.get(cid)
     if cand is None:
         return {"ok": False, "error": "not_found", "id": cid}
     last_intent = implicit_preference.get_last_intent()
-    reasons: list[str] = []
-    if last_intent:
-        reasons = explicit_preference.why_for_candidate(last_intent, cand)
+    match_score = candidate_store.match_score_for(cid, last_intent) if last_intent else None
     return {
         "ok": True,
-        "candidate": cand,
-        "reasons": reasons,
+        "candidate": {
+            "id": cand.get("id"),
+            "name": cand.get("name"),
+            "age": cand.get("age"),
+            "city": cand.get("city"),
+            "bio": cand.get("bio"),
+            "photo": cand.get("photo"),
+        },
+        "match_score": match_score,
+        "analysis_status": cand.get("analysis_status"),
         "has_intent": last_intent is not None,
+    }
+
+
+class CreateBody(BaseModel):
+    name: str = ""
+    age: Any = None
+    city: str = ""
+    photo: str = ""  # base64，不带 data: 前缀
+
+
+@app.post("/api/candidate/create")
+async def create_candidate(body: CreateBody):
+    """创建候选人 → 立即返回成功 → 后台异步 vision 分析照片（预计算 attributes）。
+
+    架构（传统 C 端思想）：写入即时反馈，分析异步（模拟消息队列），不阻塞创建。
+    后台 _analyze 用 asyncio.to_thread 跑同步 vision，不阻塞 event loop。
+    """
+    cand = candidate_store.create(body.name, body.age, body.city, body.photo)
+    return {
+        "ok": True,
+        "id": cand["id"],
+        "status": "created",
+        "msg": "创建成功，AI 正在分析照片",
+        "analysis_status": cand["analysis_status"],
     }
 
 

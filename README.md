@@ -51,9 +51,9 @@ python app.py              # → 浏览器打开 http://localhost:8000
 ```bash
 cd demo
 pip install -r requirements-dev.txt   # pytest
-python -m pytest                       # 50 个用例，全跑兜底模式（不打真 LLM、不联网）
+python -m pytest                       # 50 用例，~0.5s，全兜底模式（不打真 LLM、不联网）
 ```
-测试覆盖 5 个模块 + 全部 API 端点；`tests/conftest.py` 强制清空 key，避免 `.env` 真 key 让测试去打 LLM。
+覆盖范围见下方 [测试覆盖](#测试覆盖)。
 
 ### 体验路径
 1. 输入 `温柔、不戴眼镜、瓜子脸、文艺风` → 点「AI 帮我找」（或点「上传理想型照片」让 AI vision 反推）
@@ -93,7 +93,10 @@ python -m pytest                       # 50 个用例，全跑兜底模式（不
 │   │   └── fallback.py              # 本地兜底逻辑
 │   ├── data/candidates.json          # 12 个候选样本（启动即预计算）
 │   ├── static/                       # 手机框 UI
-│   └── avatars/                      # 自绘 SVG 头像（属性与图一致）
+│   ├── avatars/                      # 自绘 SVG 头像（属性与图一致）
+│   ├── tests/                        # pytest 用例（兜底模式，见「测试覆盖」）
+│   ├── pytest.ini
+│   └── requirements-dev.txt          # 测试依赖（pytest）
 └── docs/
     ├── 题目背景.md           # 面试原题
     ├── architecture.md      # 架构图与模块说明
@@ -108,6 +111,25 @@ python -m pytest                       # 50 个用例，全跑兜底模式（不
 
 - **demo**：Python / FastAPI / 原生 HTML·CSS·JS / OpenAI 兼容 SDK（Qwen / DeepSeek / Moonshot / 豆包 / GLM / OpenAI 均可）
 - **deck**：自包含 HTML（离线、可导出 PDF）
+
+---
+
+## 测试覆盖
+
+50 个用例，全部跑在**兜底模式**（不打真 LLM、不联网），约 0.5s 跑完。
+
+| 测试文件 | 覆盖模块 | 覆盖点 |
+|---|---|---|
+| `test_fallback.py` | `fallback` | 关键词解析（眼镜优先级/别名归一）、结构化打分（全中/部分/除零保护）、统计反推、提示模板 |
+| `test_explicit.py` | `explicit_preference` | fallback source、match top3 降序+最佳优先、图片通道不可用、归一化工具 |
+| `test_implicit.py` | `implicit_preference` | 行为采集+计数、last_intent 回写、infer 统计路、suggest 模板 |
+| `test_candidate_store.py` | `candidate_store` | 冷加载/查询、match 无兜底池、create 异步预计算失败 |
+| `test_api.py` | `app.py` | 8 个 API 端点全覆盖（含详情页不返回 AI 标定的产品克制） |
+
+设计要点：
+- **强制兜底**：`tests/conftest.py` 在导入任何模块**之前**清空 `OPENAI_API_KEY`，否则 `demo/.env` 的真 key 会让测试去打真 LLM（慢、花钱、要联网）。
+- **测试隔离**：autouse fixture 逐测试复位 `implicit_preference` / `candidate_store` 的内存全局态，避免用例间互相污染。
+- **AI 路不在单测范围**：`_parse_intent_ai` / `_infer_ai` 等真实 LLM 调用依赖外部网络与计费，由 [`docs/RUNLOG.md`](./docs/RUNLOG.md) 的真实 API 输入输出实录覆盖。
 
 ---
 

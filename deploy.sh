@@ -8,8 +8,13 @@ cd "$(dirname "$0")/demo"
 DEMO_DIR="$(pwd)"
 
 echo ">>> 1/4 装系统依赖（python3 / venv）"
-command -v python3 >/dev/null 2>&1 || { sudo apt-get update -qq && sudo apt-get install -y -qq python3; }
-python3 -c "import venv" 2>/dev/null || sudo apt-get install -y -qq python3-venv
+command -v python3 >/dev/null 2>&1 || sudo apt-get install -y -qq python3
+# Ubuntu 的 python3 自带 venv 模块但不含 ensurepip（需单独装 python3-venv），
+# 用 import ensurepip 探测才准；漏装会导致 python3 -m venv 失败。
+if ! python3 -c "import ensurepip" 2>/dev/null; then
+  sudo apt-get update -qq
+  sudo apt-get install -y -qq python3-venv
+fi
 
 echo ">>> 2/4 建 venv + 装依赖（清华镜像，国内快）"
 [ -d .venv ] || python3 -m venv .venv
